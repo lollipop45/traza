@@ -1,12 +1,16 @@
+import type { ReactNode } from "react";
+
 type SectionHeaderProps = {
   index: string;
   title: string;
   id: string;
   meta?: string;
+  /** Small controls aligned to the right edge; kept out of the flow height so the rule stays aligned. */
+  action?: ReactNode;
 };
 
 /** Numbered drawing-sheet style label: "01  TODAY ............ meta" over a hairline. */
-export function SectionHeader({ index, title, id, meta }: SectionHeaderProps) {
+export function SectionHeader({ index, title, id, meta, action }: SectionHeaderProps) {
   return (
     <div className="flex items-baseline gap-4 border-b border-charcoal/10 pb-3 font-mono text-[11px] uppercase tracking-[0.16em]">
       <span aria-hidden className="text-graphite/70">
@@ -16,6 +20,7 @@ export function SectionHeader({ index, title, id, meta }: SectionHeaderProps) {
         {title}
       </h2>
       {meta && <span className="ml-auto text-graphite">{meta}</span>}
+      {action && <div className="-my-2 ml-auto flex self-center">{action}</div>}
     </div>
   );
 }

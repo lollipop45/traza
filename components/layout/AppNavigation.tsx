@@ -11,13 +11,13 @@ import {
 type NavItem = {
   label: string;
   icon: LucideIcon;
-  /** Only Inicio has a route in this phase; the rest are visual placeholders. */
+  /** Items without a route are visual placeholders until their screens exist. */
   href?: string;
 };
 
 const navItems: NavItem[] = [
   { label: "Inicio", icon: House, href: "/" },
-  { label: "Calendario", icon: CalendarDays },
+  { label: "Calendario", icon: CalendarDays, href: "/calendar" },
   { label: "Inbox", icon: Inbox },
   { label: "Proyectos", icon: Layers },
   { label: "Asistente", icon: MessageSquare },

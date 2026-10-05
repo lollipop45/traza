@@ -1,18 +1,6 @@
-// Static placeholder content for the Home screen. Replaced by real sources in later phases.
+// Static placeholder content. Replaced by real sources in later phases.
 
-export type MockDate = {
-  weekday: string;
-  date: string;
-  short: string;
-  week: number;
-};
-
-export type UpcomingEvent = {
-  id: string;
-  time: string;
-  title: string;
-  location: string;
-};
+import type { CalendarEvent, ISODate } from "@/lib/calendar/types";
 
 export type Task = {
   id: string;
@@ -21,19 +9,24 @@ export type Task = {
   due: "Hoy" | "Mañana";
 };
 
-export const today: MockDate = {
-  weekday: "Lunes",
-  date: "5 de octubre de 2026",
-  short: "05.10.26",
-  week: 41,
-};
+/** Mocked "now" for the whole app. */
+export const today: ISODate = "2026-10-05";
 
 export const activeProjectCount = 1;
 
-export const upcomingEvents: UpcomingEvent[] = [
-  { id: "e1", time: "10:00", title: "Taller de Proyectos", location: "Aula 3.2 · Arquitectura" },
-  { id: "e2", time: "14:00", title: "Imprimir A1", location: "Copycenter" },
-  { id: "e3", time: "18:00", title: "Observación astronómica", location: "Roque de los Muchachos" },
+export const calendarEvents: CalendarEvent[] = [
+  { id: "ev-01", title: "Taller de Proyectos", date: "2026-10-05", startTime: "10:00", endTime: "13:00", location: "Aula 3.2 · Arquitectura", course: "Taller de Proyectos", category: "arquitectura", kind: "event", source: "manual" },
+  { id: "ev-02", title: "Imprimir A1", date: "2026-10-05", startTime: "14:00", location: "Copycenter", category: "arquitectura", kind: "event", source: "manual" },
+  { id: "ev-03", title: "Observación astronómica", date: "2026-10-05", startTime: "18:00", endTime: "22:00", location: "Roque de los Muchachos", category: "astronomia", kind: "event", source: "manual" },
+  { id: "ev-04", title: "Tutoría", date: "2026-10-07", startTime: "11:00", endTime: "11:30", location: "Despacho 2.14", course: "Taller de Proyectos", category: "universidad", kind: "event", source: "manual" },
+  { id: "ev-05", title: "Entrega de planos", date: "2026-10-07", startTime: "13:00", course: "Taller de Dibujo", category: "arquitectura", kind: "deadline", source: "manual" },
+  { id: "ev-06", title: "Reunión de grupo", date: "2026-10-09", startTime: "17:00", endTime: "18:30", location: "Biblioteca · Sala 4", category: "universidad", kind: "event", source: "manual" },
+  { id: "ev-07", title: "Análisis territorial", date: "2026-10-12", startTime: "23:59", course: "Taller de Proyectos", category: "arquitectura", kind: "deadline", source: "manual" },
+  { id: "ev-08", title: "Crítica de proyecto", date: "2026-10-15", startTime: "09:30", endTime: "13:30", location: "Aula 3.2 · Arquitectura", course: "Taller de Proyectos", category: "arquitectura", kind: "event", source: "manual" },
+  { id: "ev-09", title: "Examen de estructuras", date: "2026-10-19", startTime: "09:00", endTime: "12:00", location: "Aula Magna", course: "Estructuras I", category: "universidad", kind: "event", source: "manual" },
+  { id: "ev-10", title: "Entrega maqueta", date: "2026-10-23", startTime: "10:00", course: "Taller de Proyectos", category: "arquitectura", kind: "deadline", source: "manual" },
+  { id: "ev-11", title: "Observación astronómica", date: "2026-10-26", startTime: "21:00", location: "Roque de los Muchachos", category: "astronomia", kind: "event", source: "manual" },
+  { id: "ev-12", title: "Entrega final", date: "2026-10-30", startTime: "12:00", course: "Taller de Proyectos", category: "arquitectura", kind: "deadline", source: "manual" },
 ];
 
 export const tasks: Task[] = [
