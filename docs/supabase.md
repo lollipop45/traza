@@ -93,6 +93,21 @@ Las pruebas de base de datos no usan red ni credenciales: comprueban restriccion
 
 Las tareas **no** se duplican: una tarea capturada en el Inbox es una fila de `public.tasks` (misma ruta de escritura que la captura rápida de Inicio, `lib/tasks/mutations.ts`). La pantalla combina `tasks` e `inbox_items` al renderizar (`lib/inbox/feed.ts`, modelo `InboxEntry`), de más reciente a más antiguo.
 
+## Canvas (Campus Virtual) · solo lectura
+
+Variables **solo de servidor** (sin prefijo `NEXT_PUBLIC_`), en `.env.local` durante el desarrollo:
+
+| Variable | Uso |
+| --- | --- |
+| `CANVAS_BASE_URL` | Dirección https del campus, p. ej. `https://campus.example.edu` (sin `/api/v1`). |
+| `CANVAS_ACCESS_TOKEN` | Token de acceso personal de Canvas. Equivale a tu cuenta: **nunca** lo subas al repositorio, no lo pegues en chats ni capturas. |
+
+Obtener el token: en Campus Virtual → **Cuenta → Configuración → Integraciones aprobadas → + Nuevo token de acceso**, con una finalidad ("TRAZA") y una fecha de caducidad; cópialo en ese momento (Canvas no vuelve a mostrarlo). Reinicia `npm run dev` tras editar `.env.local`. Para revocarlo, bórralo en esa misma pantalla.
+
+Comprobación: `/dev/canvas` (solo en desarrollo y con sesión de TRAZA) muestra la conexión, tu usuario de Canvas y tus cursos activos. Llamadas usadas: `GET /api/v1/users/self` y `GET /api/v1/courses?enrollment_state=active&include[]=term&per_page=100` (paginación por la cabecera `Link`). No se escribe nada en Supabase.
+
+Si la universidad no permite tokens personales (el botón "Nuevo token de acceso" no aparece), la alternativa es OAuth2 con una *developer key* emitida por la administración de Canvas; no está implementado.
+
 ## Estado de la migración a datos reales
 
 | Entidad | Estado |
@@ -101,5 +116,6 @@ Las tareas **no** se duplican: una tarea capturada en el Inbox es una fila de `p
 | Proyectos (`public.projects`) | Reales en Proyectos (crear, editar, archivar, borrar) y en Inicio (proyectos activos, asignación de tareas). Recuentos de tareas derivados de `public.tasks`. |
 | Calendario (`public.calendar_events`) | Real: eventos (crear, editar, borrar) y entregas derivadas de `public.tasks`; navegación por mes en la URL (`?mes=&dia=`). Vistas Día y Semana aún sin implementar. |
 | Inbox (`public.inbox_items` + `public.tasks`) | Real: captura de tareas, ideas y notas; edición y borrado; filtros y recuentos reales. |
+| Canvas | Conexión de solo lectura (perfil y cursos activos) en `/dev/canvas`; sin importación ni datos en Supabase. |
 | Asistente | Solo datos mock (`lib/mock-data.ts`). Sus `projectId` son slugs mock, no proyectos reales. |
 | Autenticación | Implementada (correo + contraseña, un usuario creado a mano). |
