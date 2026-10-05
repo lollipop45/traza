@@ -11,8 +11,7 @@ import {
 type NavItem = {
   label: string;
   icon: LucideIcon;
-  /** Items without a route are visual placeholders until their screens exist. */
-  href?: string;
+  href: string;
 };
 
 const navItems: NavItem[] = [
@@ -20,7 +19,7 @@ const navItems: NavItem[] = [
   { label: "Calendario", icon: CalendarDays, href: "/calendar" },
   { label: "Inbox", icon: Inbox, href: "/inbox" },
   { label: "Proyectos", icon: Layers, href: "/projects" },
-  { label: "Asistente", icon: MessageSquare },
+  { label: "Asistente", icon: MessageSquare, href: "/assistant" },
 ];
 
 const itemClass =
@@ -35,38 +34,22 @@ export function AppNavigation({ activeHref }: { activeHref: string }) {
       <ul className="mx-auto grid h-16 max-w-[480px] grid-cols-5 md:max-w-[560px] lg:h-full lg:max-w-none lg:grid-cols-1 lg:content-center lg:gap-2">
         {navItems.map(({ label, icon: Icon, href }) => {
           const isActive = href === activeHref;
-          const content = (
-            <>
-              {isActive && (
-                <span
-                  aria-hidden
-                  className="absolute top-0 left-1/2 h-px w-6 -translate-x-1/2 bg-charcoal lg:top-1/2 lg:left-0 lg:h-6 lg:w-px lg:translate-x-0 lg:-translate-y-1/2"
-                />
-              )}
-              <Icon aria-hidden className="size-5" strokeWidth={1.25} />
-              <span>{label}</span>
-            </>
-          );
-
           return (
             <li key={label}>
-              {href ? (
-                <Link
-                  href={href}
-                  aria-current={isActive ? "page" : undefined}
-                  className={`${itemClass} ${isActive ? "text-charcoal" : "text-graphite hover:text-charcoal"}`}
-                >
-                  {content}
-                </Link>
-              ) : (
-                <button
-                  type="button"
-                  aria-disabled="true"
-                  className={`${itemClass} cursor-default text-graphite`}
-                >
-                  {content}
-                </button>
-              )}
+              <Link
+                href={href}
+                aria-current={isActive ? "page" : undefined}
+                className={`${itemClass} ${isActive ? "text-charcoal" : "text-graphite hover:text-charcoal"}`}
+              >
+                {isActive && (
+                  <span
+                    aria-hidden
+                    className="absolute top-0 left-1/2 h-px w-6 -translate-x-1/2 bg-charcoal lg:top-1/2 lg:left-0 lg:h-6 lg:w-px lg:translate-x-0 lg:-translate-y-1/2"
+                  />
+                )}
+                <Icon aria-hidden className="size-5" strokeWidth={1.25} />
+                <span>{label}</span>
+              </Link>
             </li>
           );
         })}

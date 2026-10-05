@@ -1,14 +1,8 @@
-import { FileText, Lightbulb, SquareCheck, type LucideIcon } from "lucide-react";
+import { itemTypeIcons } from "@/components/ui/itemTypeIcons";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import type { ISODate } from "@/lib/calendar/types";
 import { formatInboxDate, inboxTypeLabels } from "@/lib/inbox/items";
-import type { InboxItem, InboxItemType } from "@/lib/inbox/types";
-
-const typeIcons: Record<InboxItemType, LucideIcon> = {
-  task: SquareCheck,
-  idea: Lightbulb,
-  note: FileText,
-};
+import type { InboxItem } from "@/lib/inbox/types";
 
 type InboxItemListProps = {
   items: InboxItem[];
@@ -38,7 +32,7 @@ export function InboxItemList({ items, today }: InboxItemListProps) {
 }
 
 function InboxRow({ item, today }: { item: InboxItem; today: ISODate }) {
-  const Icon = typeIcons[item.type];
+  const Icon = itemTypeIcons[item.type];
   const isIdea = item.type === "idea";
   const dateLabel = formatInboxDate(item, today);
 

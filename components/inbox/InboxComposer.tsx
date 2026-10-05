@@ -1,4 +1,5 @@
 import { CalendarDays, CornerDownLeft, ImagePlus, Mic, SquareCheck, Tag } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 
 /** Visual prototype: nothing is saved or parsed in this phase. */
@@ -26,13 +27,9 @@ export function InboxComposer() {
 
           <div className="flex items-center gap-1">
             <IconButton label="Dictar por voz" icon={Mic} iconClassName="size-[18px]" />
-            <button
-              type="button"
-              className="inline-flex h-9 items-center gap-2 rounded-md bg-charcoal px-3 font-mono text-[11px] uppercase tracking-[0.14em] text-paper outline-none transition-colors hover:bg-charcoal/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sage"
-            >
+            <Button variant="primary" icon={CornerDownLeft}>
               Guardar
-              <CornerDownLeft aria-hidden className="size-3.5" strokeWidth={1.5} />
-            </button>
+            </Button>
           </div>
         </div>
       </div>

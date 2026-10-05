@@ -1,5 +1,6 @@
 // Static placeholder content. Replaced by real sources in later phases.
 
+import type { AssistantMessage } from "@/lib/assistant/types";
 import type { CalendarEvent, ISODate } from "@/lib/calendar/types";
 import type { InboxItem } from "@/lib/inbox/types";
 import type { Project } from "@/lib/projects/types";
@@ -49,6 +50,32 @@ export const inboxItems: InboxItem[] = [
   { id: "in-04", type: "note", title: "Investigar telescopios de campo amplio", createdAt: "2026-10-05T07:55", project: "Astronomía", tags: ["equipo"], projectId: "astronomia", source: "manual" },
   { id: "in-05", type: "task", title: "Terminar módulo de autenticación", createdAt: "2026-10-04T22:10", dueDate: "2026-10-06", project: "Programación", tags: [], projectId: "traza", source: "manual" },
   { id: "in-06", type: "note", title: "Posibles referencias arquitectónicas para el taller", createdAt: "2026-10-04T18:05", project: "Arquitectura", tags: ["referencias"], source: "manual" },
+];
+
+export const assistantConversation: AssistantMessage[] = [
+  {
+    id: "msg-01",
+    role: "user",
+    content: "Recuérdame entregar Taller el jueves y apunta que tengo que imprimir el A1.",
+    createdAt: "2026-10-05T10:42",
+  },
+  {
+    id: "msg-02",
+    role: "assistant",
+    content: "He entendido lo siguiente.",
+    createdAt: "2026-10-05T10:42",
+    proposedActions: [
+      { id: "act-01", type: "event", title: "Entrega Taller de Proyectos", date: "2026-10-08", startTime: "23:59", projectId: "taller-proyectos", source: "ai" },
+      { id: "act-02", type: "task", title: "Imprimir A1", date: "2026-10-07", projectId: "taller-proyectos", source: "ai" },
+    ],
+  },
+  {
+    id: "msg-03",
+    role: "assistant",
+    content: "También puedo añadir ubicación, notas o recordatorios.",
+    createdAt: "2026-10-05T10:42",
+    suggestions: ["Añadir ubicación", "Recordar el miércoles por la mañana"],
+  },
 ];
 
 export const tasks: Task[] = [
