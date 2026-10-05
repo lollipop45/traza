@@ -1,26 +1,31 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-sand: #f4f2ed;
+  --color-paper: #faf9f6;
+  --color-charcoal: #1f1f1f;
+  --color-graphite: #6b6f72;
+  --color-sage: #8fa7a3;
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Faint drafting grid, faded out towards the bottom so it never competes with text. */
+@utility blueprint-grid {
+  background-image:
+    linear-gradient(to right, rgb(31 31 31 / 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(31 31 31 / 0.05) 1px, transparent 1px);
+  background-size: 24px 24px;
+  background-position: -1px -1px;
+  mask-image: linear-gradient(to bottom, #000 25%, transparent 100%);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--color-sand);
+  color: var(--color-charcoal);
+}
+
+::selection {
+  background-color: rgb(143 167 163 / 0.35);
 }
