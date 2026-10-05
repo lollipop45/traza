@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Wordmark } from "@/components/ui/Wordmark";
 import { formatCompactDate, isoWeekNumber } from "@/lib/calendar/dates";
 import type { ISODate } from "@/lib/calendar/types";
@@ -7,9 +8,11 @@ type PageHeaderProps = {
   subtitle: string;
   /** The app's current date, shown in the technical tag next to the wordmark. */
   date: ISODate;
+  /** Optional page-level action, aligned with the title's baseline region on the right. */
+  action?: ReactNode;
 };
 
-export function PageHeader({ title, subtitle, date }: PageHeaderProps) {
+export function PageHeader({ title, subtitle, date, action }: PageHeaderProps) {
   return (
     <header>
       <div className="flex items-center justify-between">
@@ -19,9 +22,12 @@ export function PageHeader({ title, subtitle, date }: PageHeaderProps) {
         </span>
       </div>
 
-      <h1 className="mt-11 text-[44px] leading-[1.02] font-light tracking-[-0.035em] lg:mt-24 lg:text-[64px]">
-        {title}
-      </h1>
+      <div className="mt-11 flex items-end justify-between gap-4 lg:mt-24">
+        <h1 className="text-[44px] leading-[1.02] font-light tracking-[-0.035em] lg:text-[64px]">
+          {title}
+        </h1>
+        {action && <div className="mb-1 lg:mb-2">{action}</div>}
+      </div>
       <p className="mt-2.5 text-[15px] text-graphite lg:mt-3 lg:text-base">{subtitle}</p>
     </header>
   );

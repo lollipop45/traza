@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { InboxComposer } from "@/components/inbox/InboxComposer";
-import { InboxFilters } from "@/components/inbox/InboxFilters";
 import { InboxItemList } from "@/components/inbox/InboxItemList";
 import { AppShell } from "@/components/layout/AppShell";
 import { BlueprintBackdrop } from "@/components/ui/BlueprintBackdrop";
+import { FilterIndex } from "@/components/ui/FilterIndex";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { filterInboxItems, inboxFilters, resolveInboxFilter } from "@/lib/inbox/items";
@@ -16,9 +16,12 @@ export const metadata: Metadata = {
 export default async function InboxPage({ searchParams }: PageProps<"/inbox">) {
   const { tipo } = await searchParams;
   const activeFilter = resolveInboxFilter(tipo);
-  const counts = new Map(
-    inboxFilters.map((filter) => [filter, filterInboxItems(inboxItems, filter).length]),
-  );
+  const filterOptions = inboxFilters.map((filter) => ({
+    key: filter.label,
+    label: filter.label,
+    href: filter.slug ? `/inbox?tipo=${filter.slug}` : "/inbox",
+    count: filterInboxItems(inboxItems, filter).length,
+  }));
 
   return (
     <AppShell activeHref="/inbox">
@@ -35,7 +38,12 @@ export default async function InboxPage({ searchParams }: PageProps<"/inbox">) {
           <div className="hidden lg:block">
             <SectionHeader index="02" title="Tipo" id="filters-heading" />
           </div>
-          <InboxFilters filters={inboxFilters} active={activeFilter} counts={counts} />
+          <FilterIndex
+            label="Filtrar por tipo"
+            options={filterOptions}
+            activeKey={activeFilter.label}
+            variant="tabs"
+          />
         </div>
 
         <div className="lg:col-span-7 lg:col-start-1 lg:row-start-2">

@@ -1,4 +1,5 @@
 import { Plus } from "lucide-react";
+import { OutlineIconButton } from "@/components/ui/OutlineIconButton";
 
 const views = ["Día", "Semana", "Mes"] as const;
 const activeView: (typeof views)[number] = "Mes";
@@ -30,14 +31,7 @@ export function CalendarToolbar() {
         })}
       </div>
 
-      <button
-        type="button"
-        aria-label="Nuevo evento"
-        title="Nuevo evento"
-        className="grid size-9 place-items-center rounded-md border border-charcoal/15 text-charcoal outline-none transition-colors hover:bg-paper focus-visible:border-charcoal/40 focus-visible:bg-paper"
-      >
-        <Plus aria-hidden className="size-[18px]" strokeWidth={1.25} />
-      </button>
+      <OutlineIconButton label="Nuevo evento" icon={Plus} />
     </div>
   );
 }

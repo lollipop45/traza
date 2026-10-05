@@ -23,6 +23,8 @@ export type CalendarEvent = {
   /** Subject or studio the item belongs to, e.g. "Taller de Proyectos". */
   course?: string;
   category: EventCategory;
+  /** Project this event belongs to, if any. */
+  projectId?: string;
   kind: EventKind;
   source: EventSource;
   /** Identifier in the originating service, for de-duplication when syncing. */

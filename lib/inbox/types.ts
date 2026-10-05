@@ -15,8 +15,10 @@ export type InboxItem = {
   createdAt: string;
   /** Only meaningful for tasks. */
   dueDate?: ISODate;
-  /** Project or subject the capture is filed under. */
+  /** Display label of the project, subject or area the capture is filed under. */
   project?: string;
+  /** Stable project reference, when the capture belongs to a tracked project. */
+  projectId?: string;
   tags: string[];
   source: InboxSource;
 };

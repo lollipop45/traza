@@ -19,7 +19,7 @@ const navItems: NavItem[] = [
   { label: "Inicio", icon: House, href: "/" },
   { label: "Calendario", icon: CalendarDays, href: "/calendar" },
   { label: "Inbox", icon: Inbox, href: "/inbox" },
-  { label: "Proyectos", icon: Layers },
+  { label: "Proyectos", icon: Layers, href: "/projects" },
   { label: "Asistente", icon: MessageSquare },
 ];
 
