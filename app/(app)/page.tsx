@@ -6,25 +6,31 @@ import { UpcomingEvents } from "@/components/home/UpcomingEvents";
 import { BlueprintBackdrop } from "@/components/ui/BlueprintBackdrop";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { currentISODate, formatLongDate } from "@/lib/calendar/dates";
-import { getEventsOn } from "@/lib/calendar/events";
-import { calendarEvents, today as mockToday } from "@/lib/mock-data";
+import { compareItems, eventToItem, projectNameMap } from "@/lib/calendar/items";
+import { getEventsBetween } from "@/lib/calendar/queries";
 import { countActiveProjects, isAssignable } from "@/lib/projects/projects";
 import { getProjectOptions } from "@/lib/projects/queries";
 import { getHomeTasks } from "@/lib/tasks/queries";
 import { isDone } from "@/lib/tasks/types";
 
 export default async function Home() {
-  // Real: tasks, projects and the date (app time zone, computed on the server and sent as text,
-  // so neither the host's UTC clock nor the browser's zone can shift the day).
-  // Still mock: calendar events, which keep the mock date they were written for.
+  // All real: tasks, projects, events and the date (app time zone, computed on the server and sent
+  // as text, so neither the host's UTC clock nor the browser's zone can shift the day).
   const today = currentISODate();
-  const todayEvents = getEventsOn(calendarEvents, mockToday);
 
-  const [taskResult, projectResult] = await Promise.all([getHomeTasks(), getProjectOptions()]);
+  const [taskResult, projectResult, eventResult] = await Promise.all([
+    getHomeTasks(),
+    getProjectOptions(),
+    getEventsBetween(today, today),
+  ]);
   const tasks = taskResult.ok ? taskResult.tasks : null;
   const pendingCount = tasks ? tasks.filter((task) => !isDone(task)).length : null;
   const projects = projectResult.ok ? projectResult.projects : [];
   const activeProjectCount = projectResult.ok ? countActiveProjects(projects) : null;
+  // Próximos eventos = today's calendar events (all-day first, then by start time). Task deadlines
+  // stay in the task list, so nothing appears twice on Home.
+  const names = projectNameMap(projects);
+  const todayEvents = eventResult.ok ? eventResult.events.map((event) => eventToItem(event, names)).sort(compareItems) : null;
 
   return (
     <AppShell activeHref="/">
@@ -39,7 +45,7 @@ export default async function Home() {
         <div className="lg:col-span-5 lg:self-end">
           <TodayOverview
             taskCount={pendingCount}
-            eventCount={todayEvents.length}
+            eventCount={todayEvents?.length ?? null}
             projectCount={activeProjectCount}
           />
         </div>

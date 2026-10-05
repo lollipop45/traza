@@ -77,11 +77,22 @@ Las pruebas de base de datos no usan red ni credenciales: comprueban restriccion
 
 `tasks (project_id, user_id) → projects (id, user_id)` (`tasks_project_owner_fkey`). Al referenciar el par, el proyecto debe tener el **mismo dueño** que la tarea: una clave simple a `projects.id` permitiría enlazar el proyecto de otro usuario, porque las comprobaciones de claves foráneas no pasan por RLS. `ON DELETE SET NULL (project_id)`: borrar un proyecto conserva sus tareas, sin proyecto.
 
+## Calendario
+
+`public.calendar_events` (`20261005162926_create_calendar_events.sql`):
+
+- **Fechas y horas locales**: `event_date date` + `start_time` / `end_time time` (sin zona horaria) guardan la hora de pared de Atlantic/Canary tal como se escribe; ninguna conversión UTC puede mover un evento de día u hora. Eventos de todo el día: `all_day = true` y sin horas. Una importación con timestamps (Google Calendar) deberá convertir a hora de Canarias al escribir.
+- **Proyecto**: misma clave compuesta que las tareas (`calendar_events_project_owner_fkey`); borrar el proyecto conserva el evento sin proyecto.
+- **Importaciones**: índice único `(user_id, source, external_id)` cuando hay `external_id`. Los clientes no pueden escribir `source` ni `external_id`: los eventos manuales son siempre `manual` y las integraciones futuras irán en el servidor.
+- **Entregas**: las tareas con `due_date` **no** se copian a esta tabla. El calendario combina al renderizar los eventos y las tareas con fecha (`lib/calendar/items.ts`, modelo `CalendarItem`).
+- **Inicio**: "Próximos eventos" muestra solo los eventos de hoy (todo el día primero, luego por hora); las tareas siguen en su sección.
+
 ## Estado de la migración a datos reales
 
 | Entidad | Estado |
 | --- | --- |
 | Tareas (`public.tasks`) | Reales en Inicio: crear, fecha, prioridad, proyecto, editar, completar, borrar. Clientes escriben solo columnas de contenido; `source` y `external_id` ya no son escribibles (`20261005160009`). |
 | Proyectos (`public.projects`) | Reales en Proyectos (crear, editar, archivar, borrar) y en Inicio (proyectos activos, asignación de tareas). Recuentos de tareas derivados de `public.tasks`. |
-| Calendario, inbox, asistente | Solo datos mock (`lib/mock-data.ts`). Sus `projectId` son slugs mock, no proyectos reales; el "próximo hito" de un proyecto queda como "Sin hito vinculado" hasta que el calendario sea persistente. |
+| Calendario (`public.calendar_events`) | Real: eventos (crear, editar, borrar) y entregas derivadas de `public.tasks`; navegación por mes en la URL (`?mes=&dia=`). Vistas Día y Semana aún sin implementar. |
+| Inbox, asistente | Solo datos mock (`lib/mock-data.ts`). Sus `projectId` son slugs mock, no proyectos reales. |
 | Autenticación | Implementada (correo + contraseña, un usuario creado a mano). |

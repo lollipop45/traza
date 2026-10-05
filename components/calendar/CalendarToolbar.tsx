@@ -4,10 +4,17 @@ import { OutlineIconButton } from "@/components/ui/OutlineIconButton";
 const views = ["Día", "Semana", "Mes"] as const;
 const activeView: (typeof views)[number] = "Mes";
 
-export function CalendarToolbar() {
+type CalendarToolbarProps = {
+  /** Whether the new-event panel is open. */
+  creating: boolean;
+  /** Link that toggles the new-event panel for the selected day. */
+  toggleHref: string;
+};
+
+export function CalendarToolbar({ creating, toggleHref }: CalendarToolbarProps) {
   return (
     <div className="flex items-center justify-between">
-      {/* Only the month view exists in this phase; Día and Semana are placeholders. */}
+      {/* Only the month view exists; Día and Semana remain placeholders. */}
       <div
         role="group"
         aria-label="Vista del calendario"
@@ -31,7 +38,12 @@ export function CalendarToolbar() {
         })}
       </div>
 
-      <OutlineIconButton label="Nuevo evento" icon={Plus} />
+      <OutlineIconButton
+        label={creating ? "Cerrar nuevo evento" : "Nuevo evento"}
+        icon={Plus}
+        iconClassName={`size-[18px] transition-transform ${creating ? "rotate-45" : ""}`}
+        href={toggleHref}
+      />
     </div>
   );
 }

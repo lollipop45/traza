@@ -26,6 +26,17 @@ export function isProjectId(value: unknown): value is string {
   return isUuid(value);
 }
 
+/**
+ * A project reference on a task or event: "" → no project, otherwise a UUID. Whether that project
+ * exists and belongs to the same user is enforced by the database (composite owner foreign keys),
+ * never trusted to this check.
+ */
+export function parseProjectId(raw: string): Parsed<string | null> {
+  const value = raw.trim();
+  if (!value) return { ok: true, value: null };
+  return isUuid(value) ? { ok: true, value: value.toLowerCase() } : { ok: false, error: "El proyecto no es válido." };
+}
+
 export function parseProjectName(raw: string): Parsed<string> {
   const name = raw.trim();
   if (!name) return { ok: false, error: "Escribe el nombre del proyecto." };

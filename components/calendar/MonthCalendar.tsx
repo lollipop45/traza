@@ -3,8 +3,9 @@ import { ChevronLeft, ChevronRight, type LucideIcon } from "lucide-react";
 import { DeadlineMark } from "@/components/ui/DeadlineMark";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { buildMonthWeeks, formatDayHeading, formatMonthYear, type MonthDay } from "@/lib/calendar/dates";
-import { groupByDate } from "@/lib/calendar/events";
-import type { CalendarEvent, ISODate } from "@/lib/calendar/types";
+import { groupItemsByDate } from "@/lib/calendar/items";
+import type { CalendarItem, ISODate } from "@/lib/calendar/types";
+import { adjacentMonthHrefs, calendarHref } from "@/lib/calendar/view";
 
 const weekdays = [
   { short: "L", long: "lunes" },
@@ -20,16 +21,19 @@ const weekdays = [
 const MAX_MARKERS = 3;
 
 type MonthCalendarProps = {
+  /** First day of the displayed month. */
   month: ISODate;
   today: ISODate;
   selected: ISODate;
-  events: CalendarEvent[];
+  /** Real events and task deadlines of the month. */
+  items: CalendarItem[];
 };
 
-export function MonthCalendar({ month, today, selected, events }: MonthCalendarProps) {
+export function MonthCalendar({ month, today, selected, items }: MonthCalendarProps) {
   const weeks = buildMonthWeeks(month);
-  const eventsByDate = groupByDate(events);
+  const itemsByDate = groupItemsByDate(items);
   const title = formatMonthYear(month);
+  const { previous, next } = adjacentMonthHrefs(month);
 
   return (
     <section aria-labelledby="month-heading">
@@ -38,10 +42,9 @@ export function MonthCalendar({ month, today, selected, events }: MonthCalendarP
         title={title}
         id="month-heading"
         action={
-          // Month navigation is visual only in this phase.
           <>
-            <MonthNavButton label="Mes anterior" icon={ChevronLeft} />
-            <MonthNavButton label="Mes siguiente" icon={ChevronRight} />
+            <MonthNavLink label="Mes anterior" icon={ChevronLeft} href={previous} />
+            <MonthNavLink label="Mes siguiente" icon={ChevronRight} href={next} />
           </>
         }
       />
@@ -72,7 +75,7 @@ export function MonthCalendar({ month, today, selected, events }: MonthCalendarP
                 <td key={day.date} className="border-l border-charcoal/[0.06] p-0 first:border-l-0">
                   <DayCell
                     day={day}
-                    events={eventsByDate.get(day.date) ?? []}
+                    items={itemsByDate.get(day.date) ?? []}
                     isToday={day.date === today}
                     isSelected={day.date === selected}
                   />
@@ -93,23 +96,27 @@ export function MonthCalendar({ month, today, selected, events }: MonthCalendarP
         </span>
         <span className="inline-flex items-center gap-2">
           <DeadlineMark />
-          Entrega
+          Tarea
         </span>
       </div>
     </section>
   );
 }
 
-function MonthNavButton({ label, icon: Icon }: { label: string; icon: LucideIcon }) {
+/** Plain link to the adjacent month (null at the edge of the supported range). */
+function MonthNavLink({ label, icon: Icon, href }: { label: string; icon: LucideIcon; href: string | null }) {
+  const className = "grid size-8 place-items-center rounded-md outline-none focus-visible:bg-paper";
+  if (!href) {
+    return (
+      <span aria-hidden className={`${className} text-graphite/40`}>
+        <Icon className="size-4" strokeWidth={1.25} />
+      </span>
+    );
+  }
   return (
-    <button
-      type="button"
-      aria-label={label}
-      aria-disabled="true"
-      className="grid size-8 cursor-default place-items-center rounded-md text-charcoal outline-none focus-visible:bg-paper"
-    >
+    <Link href={href} scroll={false} aria-label={label} title={label} className={`${className} text-charcoal transition-colors hover:bg-paper`}>
       <Icon aria-hidden className="size-4" strokeWidth={1.25} />
-    </button>
+    </Link>
   );
 }
 
@@ -118,12 +125,12 @@ const cellClass =
 
 type DayCellProps = {
   day: MonthDay;
-  events: CalendarEvent[];
+  items: CalendarItem[];
   isToday: boolean;
   isSelected: boolean;
 };
 
-function DayCell({ day, events, isToday, isSelected }: DayCellProps) {
+function DayCell({ day, items, isToday, isSelected }: DayCellProps) {
   if (!day.inMonth) {
     return (
       <span aria-hidden className={`${cellClass} text-graphite/35`}>
@@ -134,18 +141,18 @@ function DayCell({ day, events, isToday, isSelected }: DayCellProps) {
 
   const label = [
     formatDayHeading(day.date),
-    events.length === 0 ? "sin eventos" : `${events.length} ${events.length === 1 ? "elemento" : "elementos"}`,
+    items.length === 0 ? "sin eventos" : `${items.length} ${items.length === 1 ? "elemento" : "elementos"}`,
     isToday && "hoy",
     isSelected && "seleccionado",
   ]
     .filter(Boolean)
     .join(", ");
 
-  const overflow = events.length - MAX_MARKERS;
+  const overflow = items.length - MAX_MARKERS;
 
   return (
     <Link
-      href={`/calendar?dia=${day.date}`}
+      href={calendarHref({ month: day.date, selected: day.date })}
       scroll={false}
       aria-label={label}
       aria-current={isToday ? "date" : undefined}
@@ -165,13 +172,13 @@ function DayCell({ day, events, isToday, isSelected }: DayCellProps) {
       >
         {day.day}
       </span>
-      {events.length > 0 && (
+      {items.length > 0 && (
         <span aria-hidden className="flex h-[5px] items-center gap-[3px] lg:px-2">
-          {events.slice(0, MAX_MARKERS).map((event) =>
-            event.kind === "deadline" ? (
-              <DeadlineMark key={event.id} />
+          {items.slice(0, MAX_MARKERS).map((item) =>
+            item.itemType === "task-deadline" ? (
+              <DeadlineMark key={`task-${item.id}`} done={item.done} />
             ) : (
-              <span key={event.id} className="size-1 rounded-full bg-graphite" />
+              <span key={`event-${item.id}`} className="size-1 rounded-full bg-graphite" />
             ),
           )}
           {overflow > 0 && (

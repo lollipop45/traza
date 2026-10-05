@@ -14,6 +14,65 @@ export type Database = {
   }
   public: {
     Tables: {
+      calendar_events: {
+        Row: {
+          all_day: boolean
+          created_at: string
+          description: string | null
+          end_time: string | null
+          event_date: string
+          external_id: string | null
+          id: string
+          location: string | null
+          project_id: string | null
+          source: string
+          start_time: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          all_day?: boolean
+          created_at?: string
+          description?: string | null
+          end_time?: string | null
+          event_date: string
+          external_id?: string | null
+          id?: string
+          location?: string | null
+          project_id?: string | null
+          source?: string
+          start_time?: string | null
+          title: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          all_day?: boolean
+          created_at?: string
+          description?: string | null
+          end_time?: string | null
+          event_date?: string
+          external_id?: string | null
+          id?: string
+          location?: string | null
+          project_id?: string | null
+          source?: string
+          start_time?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_events_project_owner_fkey"
+            columns: ["project_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id", "user_id"]
+          },
+        ]
+      }
       projects: {
         Row: {
           area: string | null

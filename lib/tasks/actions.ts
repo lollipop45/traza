@@ -14,11 +14,13 @@ import { isTaskId, parseTaskDetails } from "./validation";
 
 const HOME_PATH = "/";
 const PROJECTS_PATH = "/projects";
+const CALENDAR_PATH = "/calendar";
 
-/** Home lists the tasks; Projects derives its task counts from them. */
+/** Home lists the tasks; Projects derives its task counts; Calendar shows their due dates. */
 function revalidateTaskViews() {
   revalidatePath(HOME_PATH);
   revalidatePath(PROJECTS_PATH);
+  revalidatePath(CALENDAR_PATH);
 }
 
 export type CreateTaskState = {

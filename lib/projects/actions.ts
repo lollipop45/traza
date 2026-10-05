@@ -12,6 +12,7 @@ import { isProjectId, parseNewProject, parseProjectDetails } from "./validation"
 
 const PROJECTS_PATH = "/projects";
 const HOME_PATH = "/";
+const CALENDAR_PATH = "/calendar";
 
 export type ProjectMutationResult = { ok: true } | { ok: false; error: string };
 
@@ -19,6 +20,8 @@ function revalidateProjectViews() {
   revalidatePath(PROJECTS_PATH);
   // Home shows the active-project count, project names on tasks and the project choices.
   revalidatePath(HOME_PATH);
+  // Calendar shows project names on events and deadlines, and offers projects for events.
+  revalidatePath(CALENDAR_PATH);
 }
 
 /** Creates a project, then returns to the full index (the new project may not match a filter). */

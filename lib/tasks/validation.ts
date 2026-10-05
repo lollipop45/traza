@@ -1,5 +1,6 @@
 import { isValidISODate } from "@/lib/calendar/dates";
 import type { ISODate } from "@/lib/calendar/types";
+import { parseProjectId } from "@/lib/projects/validation";
 import { charLength, formField, isUuid, type Parsed } from "@/lib/validation";
 import { DEFAULT_TASK_PRIORITY, TASK_TITLE_MAX_LENGTH, isTaskPriority, type TaskPriority } from "./types";
 
@@ -7,6 +8,7 @@ import { DEFAULT_TASK_PRIORITY, TASK_TITLE_MAX_LENGTH, isTaskPriority, type Task
 // anything else the browser sends (user_id, source, …) is ignored.
 
 export type { Parsed } from "@/lib/validation";
+export { parseProjectId } from "@/lib/projects/validation";
 
 /** Editable task fields, named like their `public.tasks` columns. */
 export type TaskDetails = {
@@ -43,16 +45,6 @@ export function parseDueDate(raw: string): Parsed<ISODate | null> {
 export function parsePriority(raw: string): Parsed<TaskPriority> {
   if (!raw) return { ok: true, value: DEFAULT_TASK_PRIORITY };
   return isTaskPriority(raw) ? { ok: true, value: raw } : { ok: false, error: "La prioridad no es válida." };
-}
-
-/**
- * "" → no project. Otherwise it must be a UUID. Whether that project exists and belongs to the
- * same user is enforced by the database (tasks_project_owner_fkey), not trusted to this check.
- */
-export function parseProjectId(raw: string): Parsed<string | null> {
-  const value = raw.trim();
-  if (!value) return { ok: true, value: null };
-  return isUuid(value) ? { ok: true, value: value.toLowerCase() } : { ok: false, error: "El proyecto no es válido." };
 }
 
 /**

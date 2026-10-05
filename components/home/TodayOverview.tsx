@@ -3,7 +3,7 @@ import { SectionHeader } from "@/components/ui/SectionHeader";
 type TodayOverviewProps = {
   /** Real counts are null when they could not be loaded; shown as a dash. */
   taskCount: number | null;
-  eventCount: number;
+  eventCount: number | null;
   /** Projects with status `active`. */
   projectCount: number | null;
 };
@@ -11,7 +11,7 @@ type TodayOverviewProps = {
 export function TodayOverview({ taskCount, eventCount, projectCount }: TodayOverviewProps) {
   const items = [
     { value: taskCount ?? "—", label: taskCount === 1 ? "Tarea" : "Tareas" },
-    { value: eventCount, label: eventCount === 1 ? "Evento" : "Eventos" },
+    { value: eventCount ?? "—", label: eventCount === 1 ? "Evento" : "Eventos" },
     { value: projectCount ?? "—", label: projectCount === 1 ? "Proyecto activo" : "Proyectos activos" },
   ];
 
