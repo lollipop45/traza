@@ -2,13 +2,12 @@
 
 import type { AssistantMessage } from "@/lib/assistant/types";
 import type { ISODate } from "@/lib/calendar/types";
-import type { InboxItem } from "@/lib/inbox/types";
 
-/** Mocked "now" for the screens that still use mock data (Inbox, Assistant). */
+/** Mocked "now" for the screen that still uses mock data (Assistant). */
 export const today: ISODate = "2026-10-05";
 
 /**
- * Names for the project slugs referenced by the mock inbox and assistant data. These are
+ * Names for the project slugs referenced by the mock assistant data. These are
  * NOT real projects (those live in public.projects, with UUIDs); they only label mock content.
  */
 export const mockProjectNames: Record<string, string> = {
@@ -17,16 +16,6 @@ export const mockProjectNames: Record<string, string> = {
   astronomia: "Astronomía",
   traza: "TRAZA",
 };
-
-/** Most recent capture first. */
-export const inboxItems: InboxItem[] = [
-  { id: "in-01", type: "task", title: "Comprar cartón pluma", createdAt: "2026-10-05T09:40", dueDate: "2026-10-05", project: "Arquitectura", tags: ["maqueta"], source: "manual" },
-  { id: "in-02", type: "task", title: "Preguntar a Orlando por los detalles de la maqueta", createdAt: "2026-10-05T09:12", dueDate: "2026-10-06", project: "Taller de Dibujo", tags: ["maqueta"], projectId: "dibujo-integrado-iii", source: "manual" },
-  { id: "in-03", type: "idea", title: "Vivienda experimental semienterrada en Ucanca", content: "Excavar en la ladera para aprovechar la inercia térmica del terreno.", createdAt: "2026-10-05T08:30", project: "Taller de Proyectos", tags: ["vivienda", "paisaje"], projectId: "taller-proyectos", source: "manual" },
-  { id: "in-04", type: "note", title: "Investigar telescopios de campo amplio", createdAt: "2026-10-05T07:55", project: "Astronomía", tags: ["equipo"], projectId: "astronomia", source: "manual" },
-  { id: "in-05", type: "task", title: "Terminar módulo de autenticación", createdAt: "2026-10-04T22:10", dueDate: "2026-10-06", project: "Programación", tags: [], projectId: "traza", source: "manual" },
-  { id: "in-06", type: "note", title: "Posibles referencias arquitectónicas para el taller", createdAt: "2026-10-04T18:05", project: "Arquitectura", tags: ["referencias"], source: "manual" },
-];
 
 export const assistantConversation: AssistantMessage[] = [
   {

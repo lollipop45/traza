@@ -9,6 +9,10 @@ export type HomeTask = Pick<TaskRow, "id" | "title" | "status" | "priority" | "d
 /** Column list for queries returning `HomeTask`, kept next to the type it must match. */
 export const HOME_TASK_COLUMNS = "id, title, status, priority, due_date, completed_at, project_id";
 
+/** A task as the Inbox shows it: the Home projection plus when it was captured. */
+export type InboxTask = HomeTask & Pick<TaskRow, "created_at">;
+export const INBOX_TASK_COLUMNS = `${HOME_TASK_COLUMNS}, created_at`;
+
 /** The columns the calendar needs to show a task as a deadline item. */
 export type DeadlineTask = Pick<TaskRow, "id" | "title" | "status" | "due_date" | "project_id">;
 export const DEADLINE_TASK_COLUMNS = "id, title, status, due_date, project_id";

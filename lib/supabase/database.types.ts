@@ -73,6 +73,53 @@ export type Database = {
           },
         ]
       }
+      inbox_items: {
+        Row: {
+          content: string | null
+          created_at: string
+          external_id: string | null
+          id: string
+          kind: string
+          project_id: string | null
+          source: string
+          title: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string
+          external_id?: string | null
+          id?: string
+          kind: string
+          project_id?: string | null
+          source?: string
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          content?: string | null
+          created_at?: string
+          external_id?: string | null
+          id?: string
+          kind?: string
+          project_id?: string | null
+          source?: string
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inbox_items_project_owner_fkey"
+            columns: ["project_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id", "user_id"]
+          },
+        ]
+      }
       projects: {
         Row: {
           area: string | null

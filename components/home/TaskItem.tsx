@@ -4,12 +4,12 @@
 // inline editor. The database stays the source of truth: every change goes through a Server
 // Action, then Home is revalidated.
 import { Check, PencilLine } from "lucide-react";
-import { useOptimistic, useRef, useState, useTransition } from "react";
+import { useRef, useState } from "react";
+import { useTaskCompletion } from "@/components/tasks/useTaskCompletion";
 import type { ISODate } from "@/lib/calendar/types";
 import type { ProjectOption } from "@/lib/projects/types";
-import { setTaskCompleted } from "@/lib/tasks/actions";
 import { formatDueLabel } from "@/lib/tasks/format";
-import { isDone, type HomeTask } from "@/lib/tasks/types";
+import type { HomeTask } from "@/lib/tasks/types";
 import { TaskEditor } from "./TaskEditor";
 
 const PRIORITY_MARKS: Partial<Record<string, { text: string; className: string }>> = {
@@ -25,10 +25,7 @@ type TaskItemProps = {
 };
 
 export function TaskItem({ task, today, projects }: TaskItemProps) {
-  // Falls back to the server value automatically if the update fails.
-  const [optimisticDone, setOptimisticDone] = useOptimistic(isDone(task));
-  const [, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
+  const { done: optimisticDone, toggle, error } = useTaskCompletion(task);
   const [editing, setEditing] = useState(false);
   const editButton = useRef<HTMLButtonElement>(null);
 
@@ -36,15 +33,6 @@ export function TaskItem({ task, today, projects }: TaskItemProps) {
   const due = formatDueLabel(task.due_date, today);
   const priority = PRIORITY_MARKS[task.priority];
   const projectName = task.project_id ? projects.find((project) => project.id === task.project_id)?.name : undefined;
-
-  function toggle(next: boolean) {
-    setError(null);
-    startTransition(async () => {
-      setOptimisticDone(next);
-      const result = await setTaskCompleted(task.id, next);
-      if (!result.ok) setError(result.error);
-    });
-  }
 
   function closeEditor() {
     setEditing(false);

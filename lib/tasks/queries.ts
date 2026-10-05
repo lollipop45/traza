@@ -2,7 +2,14 @@ import "server-only";
 import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import type { ISODate } from "@/lib/calendar/types";
-import { DEADLINE_TASK_COLUMNS, HOME_TASK_COLUMNS, type DeadlineTask, type HomeTask } from "./types";
+import {
+  DEADLINE_TASK_COLUMNS,
+  HOME_TASK_COLUMNS,
+  INBOX_TASK_COLUMNS,
+  type DeadlineTask,
+  type HomeTask,
+  type InboxTask,
+} from "./types";
 
 /** Enough for a personal list; pending tasks sort first, so only old completed ones fall off. */
 const HOME_TASK_LIMIT = 200;
@@ -73,6 +80,28 @@ export async function getPendingDeadlineTasks(): Promise<DeadlineTasksResult> {
     .order("due_date", { ascending: true })
     .order("id", { ascending: true })
     .limit(UPCOMING_DEADLINE_LIMIT);
+
+  if (error) return { ok: false };
+  return { ok: true, tasks: data };
+}
+
+/** Enough for a personal capture feed; the newest are always included. */
+const INBOX_TASK_LIMIT = 200;
+
+export type InboxTasksResult = { ok: true; tasks: InboxTask[] } | { ok: false };
+
+/** The signed-in user's tasks, newest captured first: the same rows Home shows. */
+export async function getRecentTasks(): Promise<InboxTasksResult> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("tasks")
+    .select(INBOX_TASK_COLUMNS)
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: true })
+    .limit(INBOX_TASK_LIMIT);
 
   if (error) return { ok: false };
   return { ok: true, tasks: data };

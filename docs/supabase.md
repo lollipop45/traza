@@ -87,6 +87,12 @@ Las pruebas de base de datos no usan red ni credenciales: comprueban restriccion
 - **Entregas**: las tareas con `due_date` **no** se copian a esta tabla. El calendario combina al renderizar los eventos y las tareas con fecha (`lib/calendar/items.ts`, modelo `CalendarItem`).
 - **Inicio**: "Próximos eventos" muestra solo los eventos de hoy (todo el día primero, luego por hora); las tareas siguen en su sección.
 
+## Inbox
+
+`public.inbox_items` (`20261005165232_create_inbox_items.sql`) guarda **solo ideas y notas** (`kind` = `idea` | `note`). Título y contenido son opcionales, pero nunca ambos vacíos. Mismo patrón que el resto: dueño por defecto `auth.uid()`, RLS de dueño, clave compuesta al proyecto (`ON DELETE SET NULL (project_id)`), índice único `(user_id, source, external_id)` y sin escritura de cliente en `source` / `external_id`.
+
+Las tareas **no** se duplican: una tarea capturada en el Inbox es una fila de `public.tasks` (misma ruta de escritura que la captura rápida de Inicio, `lib/tasks/mutations.ts`). La pantalla combina `tasks` e `inbox_items` al renderizar (`lib/inbox/feed.ts`, modelo `InboxEntry`), de más reciente a más antiguo.
+
 ## Estado de la migración a datos reales
 
 | Entidad | Estado |
@@ -94,5 +100,6 @@ Las pruebas de base de datos no usan red ni credenciales: comprueban restriccion
 | Tareas (`public.tasks`) | Reales en Inicio: crear, fecha, prioridad, proyecto, editar, completar, borrar. Clientes escriben solo columnas de contenido; `source` y `external_id` ya no son escribibles (`20261005160009`). |
 | Proyectos (`public.projects`) | Reales en Proyectos (crear, editar, archivar, borrar) y en Inicio (proyectos activos, asignación de tareas). Recuentos de tareas derivados de `public.tasks`. |
 | Calendario (`public.calendar_events`) | Real: eventos (crear, editar, borrar) y entregas derivadas de `public.tasks`; navegación por mes en la URL (`?mes=&dia=`). Vistas Día y Semana aún sin implementar. |
-| Inbox, asistente | Solo datos mock (`lib/mock-data.ts`). Sus `projectId` son slugs mock, no proyectos reales. |
+| Inbox (`public.inbox_items` + `public.tasks`) | Real: captura de tareas, ideas y notas; edición y borrado; filtros y recuentos reales. |
+| Asistente | Solo datos mock (`lib/mock-data.ts`). Sus `projectId` son slugs mock, no proyectos reales. |
 | Autenticación | Implementada (correo + contraseña, un usuario creado a mano). |

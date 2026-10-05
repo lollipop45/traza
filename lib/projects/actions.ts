@@ -13,6 +13,7 @@ import { isProjectId, parseNewProject, parseProjectDetails } from "./validation"
 const PROJECTS_PATH = "/projects";
 const HOME_PATH = "/";
 const CALENDAR_PATH = "/calendar";
+const INBOX_PATH = "/inbox";
 
 export type ProjectMutationResult = { ok: true } | { ok: false; error: string };
 
@@ -22,6 +23,8 @@ function revalidateProjectViews() {
   revalidatePath(HOME_PATH);
   // Calendar shows project names on events and deadlines, and offers projects for events.
   revalidatePath(CALENDAR_PATH);
+  // Inbox shows project names on captures and offers projects for new ones.
+  revalidatePath(INBOX_PATH);
 }
 
 /** Creates a project, then returns to the full index (the new project may not match a filter). */

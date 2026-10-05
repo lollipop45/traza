@@ -8,17 +8,19 @@ type ChoiceGroupProps = {
   options: readonly { value: string; label: string }[];
   value: string;
   onChange: (value: string) => void;
+  /** Keep the label for assistive tech only, e.g. inside a composer bar. */
+  hideLabel?: boolean;
 };
 
 /**
  * Compact segmented choice built on native radio inputs (arrow-key navigation, form submission).
  * Same outline-and-hairline language as the calendar view selector.
  */
-export function ChoiceGroup({ id, label, name, options, value, onChange }: ChoiceGroupProps) {
+export function ChoiceGroup({ id, label, name, options, value, onChange, hideLabel = false }: ChoiceGroupProps) {
   const labelId = `${id}-label`;
   return (
     <div className="flex flex-col gap-2">
-      <span id={labelId} className="font-mono text-[10px] uppercase tracking-[0.14em] text-graphite">
+      <span id={labelId} className={hideLabel ? "sr-only" : "font-mono text-[10px] uppercase tracking-[0.14em] text-graphite"}>
         {label}
       </span>
       <div

@@ -6,8 +6,12 @@ import { BlueprintBackdrop } from "@/components/ui/BlueprintBackdrop";
 import { FilterIndex } from "@/components/ui/FilterIndex";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SectionHeader } from "@/components/ui/SectionHeader";
-import { filterInboxItems, inboxFilters, resolveInboxFilter } from "@/lib/inbox/items";
-import { inboxItems, today } from "@/lib/mock-data";
+import { currentISODate } from "@/lib/calendar/dates";
+import { buildInboxFeed, filterEntries, inboxFilters, resolveInboxFilter } from "@/lib/inbox/feed";
+import { getRecentCaptures } from "@/lib/inbox/queries";
+import { isAssignable } from "@/lib/projects/projects";
+import { getProjectOptions } from "@/lib/projects/queries";
+import { getRecentTasks } from "@/lib/tasks/queries";
 
 export const metadata: Metadata = {
   title: "Inbox · TRAZA",
@@ -16,11 +20,23 @@ export const metadata: Metadata = {
 export default async function InboxPage({ searchParams }: PageProps<"/inbox">) {
   const { tipo } = await searchParams;
   const activeFilter = resolveInboxFilter(tipo);
+  const today = currentISODate();
+
+  // Two sources of truth, merged only for display: tasks (public.tasks, the same rows Home shows)
+  // and ideas/notes (public.inbox_items).
+  const [taskResult, captureResult, projectResult] = await Promise.all([
+    getRecentTasks(),
+    getRecentCaptures(),
+    getProjectOptions(),
+  ]);
+  const projects = projectResult.ok ? projectResult.projects : [];
+  const feed = taskResult.ok && captureResult.ok ? buildInboxFeed(taskResult.tasks, captureResult.captures, projects) : null;
+
   const filterOptions = inboxFilters.map((filter) => ({
     key: filter.label,
     label: filter.label,
     href: filter.slug ? `/inbox?tipo=${filter.slug}` : "/inbox",
-    count: filterInboxItems(inboxItems, filter).length,
+    count: feed ? filterEntries(feed, filter).length : 0,
   }));
 
   return (
@@ -30,7 +46,7 @@ export default async function InboxPage({ searchParams }: PageProps<"/inbox">) {
 
         <div className="flex flex-col gap-6 lg:col-span-7 lg:gap-8">
           <PageHeader title="Inbox" subtitle="Captura cualquier cosa. Organízala después." date={today} />
-          <InboxComposer />
+          <InboxComposer projects={projects.filter(isAssignable)} />
         </div>
 
         {/* Sits right under the composer on mobile; becomes an index beside the list on desktop. */}
@@ -47,7 +63,7 @@ export default async function InboxPage({ searchParams }: PageProps<"/inbox">) {
         </div>
 
         <div className="lg:col-span-7 lg:col-start-1 lg:row-start-2">
-          <InboxItemList items={filterInboxItems(inboxItems, activeFilter)} today={today} />
+          <InboxItemList entries={feed ? filterEntries(feed, activeFilter) : null} today={today} projects={projects} />
         </div>
       </div>
     </AppShell>

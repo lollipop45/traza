@@ -29,6 +29,11 @@ export function currentISODate(timeZone: string = APP_TIME_ZONE): ISODate {
   return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 }
 
+/** Calendar date of an instant (e.g. a timestamptz from the database) in `timeZone`. */
+export function isoDateInZone(timestamp: string, timeZone: string = APP_TIME_ZONE): ISODate {
+  return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(timestamp));
+}
+
 export function addDays(iso: ISODate, days: number): ISODate {
   const date = parseISODate(iso);
   date.setUTCDate(date.getUTCDate() + days);
