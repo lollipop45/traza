@@ -5,13 +5,6 @@ import type { CalendarEvent, ISODate } from "@/lib/calendar/types";
 import type { InboxItem } from "@/lib/inbox/types";
 import type { Project } from "@/lib/projects/types";
 
-export type Task = {
-  id: string;
-  title: string;
-  area: string;
-  due: "Hoy" | "Mañana";
-};
-
 /** Mocked "now" for the whole app. */
 export const today: ISODate = "2026-10-05";
 
@@ -76,11 +69,4 @@ export const assistantConversation: AssistantMessage[] = [
     createdAt: "2026-10-05T10:42",
     suggestions: ["Añadir ubicación", "Recordar el miércoles por la mañana"],
   },
-];
-
-export const tasks: Task[] = [
-  { id: "t1", title: "Revisar planos del taller", area: "Arquitectura", due: "Hoy" },
-  { id: "t2", title: "Comprar cartón pluma", area: "Arquitectura", due: "Hoy" },
-  { id: "t3", title: "Leer artículo sobre exoplanetas", area: "Astronomía", due: "Mañana" },
-  { id: "t4", title: "Terminar módulo de autenticación", area: "Programación", due: "Mañana" },
 ];

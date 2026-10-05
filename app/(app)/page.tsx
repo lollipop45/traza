@@ -7,10 +7,16 @@ import { BlueprintBackdrop } from "@/components/ui/BlueprintBackdrop";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { formatLongDate } from "@/lib/calendar/dates";
 import { getEventsOn } from "@/lib/calendar/events";
-import { activeProjectCount, calendarEvents, tasks, today } from "@/lib/mock-data";
+import { activeProjectCount, calendarEvents, today } from "@/lib/mock-data";
+import { getHomeTasks } from "@/lib/tasks/queries";
+import { isDone } from "@/lib/tasks/types";
 
-export default function Home() {
+export default async function Home() {
+  // Events and projects are still mock data; tasks are real (public.tasks, current user only).
   const todayEvents = getEventsOn(calendarEvents, today);
+  const taskResult = await getHomeTasks();
+  const tasks = taskResult.ok ? taskResult.tasks : null;
+  const pendingCount = tasks ? tasks.filter((task) => !isDone(task)).length : null;
 
   return (
     <AppShell activeHref="/">
@@ -24,7 +30,7 @@ export default function Home() {
 
         <div className="lg:col-span-5 lg:self-end">
           <TodayOverview
-            taskCount={tasks.length}
+            taskCount={pendingCount}
             eventCount={todayEvents.length}
             projectCount={activeProjectCount}
           />
@@ -35,7 +41,7 @@ export default function Home() {
         </div>
 
         <div className="lg:col-span-7 lg:col-start-1 lg:row-start-2">
-          <TaskList tasks={tasks} />
+          <TaskList tasks={tasks} pendingCount={pendingCount} today={today} />
         </div>
       </div>
     </AppShell>

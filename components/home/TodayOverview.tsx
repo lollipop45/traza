@@ -1,14 +1,15 @@
 import { SectionHeader } from "@/components/ui/SectionHeader";
 
 type TodayOverviewProps = {
-  taskCount: number;
+  /** null when the count could not be loaded; shown as a dash. */
+  taskCount: number | null;
   eventCount: number;
   projectCount: number;
 };
 
 export function TodayOverview({ taskCount, eventCount, projectCount }: TodayOverviewProps) {
   const items = [
-    { value: taskCount, label: taskCount === 1 ? "Tarea" : "Tareas" },
+    { value: taskCount ?? "—", label: taskCount === 1 ? "Tarea" : "Tareas" },
     { value: eventCount, label: eventCount === 1 ? "Evento" : "Eventos" },
     { value: projectCount, label: projectCount === 1 ? "Proyecto activo" : "Proyectos activos" },
   ];
