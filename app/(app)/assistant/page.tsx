@@ -5,14 +5,14 @@ import { ConversationLog } from "@/components/assistant/ConversationLog";
 import { AppShell } from "@/components/layout/AppShell";
 import { BlueprintBackdrop } from "@/components/ui/BlueprintBackdrop";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { assistantConversation, projects, today } from "@/lib/mock-data";
+import { assistantConversation, mockProjectNames, today } from "@/lib/mock-data";
 
 export const metadata: Metadata = {
   title: "Asistente · TRAZA",
 };
 
 export default function AssistantPage() {
-  const projectNames = new Map(projects.map((project) => [project.id, project.name]));
+  const projectNames = new Map(Object.entries(mockProjectNames));
 
   return (
     <AppShell activeHref="/assistant">

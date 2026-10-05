@@ -63,10 +63,25 @@ Después, tipar los clientes: `createServerClient<Database>(…)` y `createBrows
 
 Con `npm run dev`, abrir `/dev/supabase` (solo existe en desarrollo). Distingue: configuración ausente · sin conexión · migración pendiente · sin sesión con acceso bloqueado (esperado) · alerta si el acceso anónimo funciona · sesión sin privilegios (falta la migración de privilegios) · sesión con acceso seguro (`foreignRows` debe ser 0). Ruta temporal: borrar `app/dev/` cuando haya datos reales en la interfaz.
 
+## Pruebas
+
+```bash
+npm test          # todas
+npm run test:unit # validación y lógica pura (sin base de datos)
+npm run test:db   # aplica supabase/migrations/*.sql a un Postgres en memoria (PGlite) con stubs de Supabase
+```
+
+Las pruebas de base de datos no usan red ni credenciales: comprueban restricciones, RLS, privilegios y la relación tareas → proyectos como usuarios ficticios A y B.
+
+## Relación tareas → proyectos
+
+`tasks (project_id, user_id) → projects (id, user_id)` (`tasks_project_owner_fkey`). Al referenciar el par, el proyecto debe tener el **mismo dueño** que la tarea: una clave simple a `projects.id` permitiría enlazar el proyecto de otro usuario, porque las comprobaciones de claves foráneas no pasan por RLS. `ON DELETE SET NULL (project_id)`: borrar un proyecto conserva sus tareas, sin proyecto.
+
 ## Estado de la migración a datos reales
 
 | Entidad | Estado |
 | --- | --- |
-| Tareas (`public.tasks`) | Esquema, RLS e índices. Usuarios autenticados: lectura, borrado, y alta/edición solo de columnas de contenido (`id`, `user_id`, `created_at`, `updated_at` los fija la BD). `anon` sin acceso. La interfaz sigue usando datos mock. |
-| Proyectos, calendario, inbox, asistente | Solo datos mock (`lib/mock-data.ts`). |
+| Tareas (`public.tasks`) | Reales en Inicio: crear, fecha, prioridad, proyecto, editar, completar, borrar. Clientes escriben solo columnas de contenido; `source` y `external_id` ya no son escribibles (`20261005160009`). |
+| Proyectos (`public.projects`) | Reales en Proyectos (crear, editar, archivar, borrar) y en Inicio (proyectos activos, asignación de tareas). Recuentos de tareas derivados de `public.tasks`. |
+| Calendario, inbox, asistente | Solo datos mock (`lib/mock-data.ts`). Sus `projectId` son slugs mock, no proyectos reales; el "próximo hito" de un proyecto queda como "Sin hito vinculado" hasta que el calendario sea persistente. |
 | Autenticación | Implementada (correo + contraseña, un usuario creado a mano). |

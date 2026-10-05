@@ -1,11 +1,13 @@
 "use client";
 
 // Optional task fields shared by quick capture and the inline editor. They submit exactly the
-// column names the server validates: `due_date` (YYYY-MM-DD or empty) and `priority`.
+// column names the server validates: `due_date` (YYYY-MM-DD or empty), `priority` and
+// `project_id` (UUID or empty).
 import { useState } from "react";
 import { ChoiceGroup } from "@/components/ui/ChoiceGroup";
 import { addDays } from "@/lib/calendar/dates";
 import type { ISODate } from "@/lib/calendar/types";
+import type { ProjectOption } from "@/lib/projects/types";
 import { PRIORITY_LABELS } from "@/lib/tasks/format";
 import { TASK_PRIORITIES, type TaskPriority } from "@/lib/tasks/types";
 
@@ -62,6 +64,46 @@ export function DueDateField({ idPrefix, today, initial }: DueDateFieldProps) {
         />
       )}
       <input type="hidden" name="due_date" value={dueDate} />
+    </div>
+  );
+}
+
+type ProjectFieldProps = {
+  idPrefix: string;
+  /** Already narrowed with `projectChoices`: assignable projects plus the task's current one. */
+  projects: ProjectOption[];
+  initial: string | null;
+};
+
+/**
+ * Native select: scales to any number of projects and uses the platform picker on phones.
+ * Shows names only; the submitted value is the project's id (validated on the server, owner
+ * enforced by the database). Without projects there is nothing to choose, so nothing renders.
+ */
+export function ProjectField({ idPrefix, projects, initial }: ProjectFieldProps) {
+  // Controlled, like the other fields, so a failed quick capture keeps the choice.
+  const [projectId, setProjectId] = useState(initial ?? "");
+  if (projects.length === 0) return null;
+  const id = `${idPrefix}-project`;
+  return (
+    <div className="flex flex-col gap-2">
+      <label htmlFor={id} className="font-mono text-[10px] uppercase tracking-[0.14em] text-graphite">
+        Proyecto
+      </label>
+      <select
+        id={id}
+        name="project_id"
+        value={projectId}
+        onChange={(event) => setProjectId(event.target.value)}
+        className="h-9 w-full max-w-xs rounded-md border border-charcoal/15 bg-paper px-2.5 text-[14px] text-charcoal outline-none focus:border-charcoal/40"
+      >
+        <option value="">Sin proyecto</option>
+        {projects.map((project) => (
+          <option key={project.id} value={project.id}>
+            {project.status === "archived" ? `${project.name} · Archivado` : project.name}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }

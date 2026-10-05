@@ -4,19 +4,26 @@
 // resetting after a save. The task is validated and inserted by the `createTask` Server Action.
 import { Mic, Plus } from "lucide-react";
 import { useActionState, useState } from "react";
-import { DueDateField, PriorityField } from "@/components/tasks/TaskFields";
+import { DueDateField, PriorityField, ProjectField } from "@/components/tasks/TaskFields";
 import { Button } from "@/components/ui/Button";
 import { ComposerBar } from "@/components/ui/ComposerBar";
 import { IconButton } from "@/components/ui/IconButton";
 import type { ISODate } from "@/lib/calendar/types";
+import type { ProjectOption } from "@/lib/projects/types";
 import { createTask, type CreateTaskState } from "@/lib/tasks/actions";
 import { DEFAULT_TASK_PRIORITY, TASK_TITLE_MAX_LENGTH } from "@/lib/tasks/types";
 
 const initialState: CreateTaskState = { error: null, title: "", created: 0 };
 const OPTIONS_ID = "capture-options";
 
-/** Enter creates a task with the defaults; "+" reveals optional date and priority. */
-export function QuickCapture({ today }: { today: ISODate }) {
+type QuickCaptureProps = {
+  today: ISODate;
+  /** Projects a new task can be assigned to (in course or planned). */
+  projects: ProjectOption[];
+};
+
+/** Enter creates a task with the defaults; "+" reveals optional date, priority and project. */
+export function QuickCapture({ today, projects }: QuickCaptureProps) {
   const [state, formAction, pending] = useActionState(createTask, initialState);
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [handledCreates, setHandledCreates] = useState(0);
@@ -49,7 +56,7 @@ export function QuickCapture({ today }: { today: ISODate }) {
         trailing={<IconButton label="Captura por voz" icon={Mic} iconClassName="size-[18px]" />}
       />
 
-      {/* Always rendered so its defaults (no date, normal priority) are submitted with Enter.
+      {/* Always rendered so its defaults (no date, normal priority, no project) are submitted with Enter.
           Keyed by the create count so the choices reset after each saved task. */}
       <div
         key={state.created}
@@ -59,6 +66,7 @@ export function QuickCapture({ today }: { today: ISODate }) {
       >
         <DueDateField idPrefix="capture" today={today} initial={null} />
         <PriorityField idPrefix="capture" initial={DEFAULT_TASK_PRIORITY} />
+        <ProjectField idPrefix="capture" projects={projects} initial={null} />
         <div>
           <Button variant="primary" type="submit" disabled={pending}>
             Añadir tarea

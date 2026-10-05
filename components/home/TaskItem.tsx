@@ -6,6 +6,7 @@
 import { Check, PencilLine } from "lucide-react";
 import { useOptimistic, useRef, useState, useTransition } from "react";
 import type { ISODate } from "@/lib/calendar/types";
+import type { ProjectOption } from "@/lib/projects/types";
 import { setTaskCompleted } from "@/lib/tasks/actions";
 import { formatDueLabel } from "@/lib/tasks/format";
 import { isDone, type HomeTask } from "@/lib/tasks/types";
@@ -16,7 +17,14 @@ const PRIORITY_MARKS: Partial<Record<string, { text: string; className: string }
   low: { text: "Prioridad baja", className: "text-graphite" },
 };
 
-export function TaskItem({ task, today }: { task: HomeTask; today: ISODate }) {
+type TaskItemProps = {
+  task: HomeTask;
+  today: ISODate;
+  /** All of the user's projects (names for display, choices for the editor). */
+  projects: ProjectOption[];
+};
+
+export function TaskItem({ task, today, projects }: TaskItemProps) {
   // Falls back to the server value automatically if the update fails.
   const [optimisticDone, setOptimisticDone] = useOptimistic(isDone(task));
   const [, startTransition] = useTransition();
@@ -27,6 +35,7 @@ export function TaskItem({ task, today }: { task: HomeTask; today: ISODate }) {
   const errorId = `task-${task.id}-error`;
   const due = formatDueLabel(task.due_date, today);
   const priority = PRIORITY_MARKS[task.priority];
+  const projectName = task.project_id ? projects.find((project) => project.id === task.project_id)?.name : undefined;
 
   function toggle(next: boolean) {
     setError(null);
@@ -46,7 +55,7 @@ export function TaskItem({ task, today }: { task: HomeTask; today: ISODate }) {
   if (editing) {
     return (
       <li>
-        <TaskEditor task={task} today={today} onClose={closeEditor} />
+        <TaskEditor task={task} today={today} projects={projects} onClose={closeEditor} />
       </li>
     );
   }
@@ -73,6 +82,9 @@ export function TaskItem({ task, today }: { task: HomeTask; today: ISODate }) {
           <span className="block text-[15px] font-medium tracking-[-0.01em] break-words transition-colors group-has-checked:text-graphite group-has-checked:line-through">
             {task.title}
           </span>
+          {projectName && (
+            <span className="mt-1 block text-[13px] break-words text-graphite">{projectName}</span>
+          )}
           {priority && (
             <span
               className={`mt-1 block font-mono text-[10px] uppercase tracking-[0.14em] group-has-checked:text-graphite/70 ${priority.className}`}

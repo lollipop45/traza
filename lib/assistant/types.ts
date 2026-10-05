@@ -1,5 +1,4 @@
 import type { ISODate, TimeOfDay } from "@/lib/calendar/types";
-import type { ProjectId } from "@/lib/projects/types";
 
 export type ProposedActionType = "task" | "event" | "note" | "project";
 
@@ -15,7 +14,8 @@ export type ProposedAction = {
   date?: ISODate;
   startTime?: TimeOfDay;
   endTime?: TimeOfDay;
-  projectId?: ProjectId;
+  /** Mock project slug (see `mockProjectNames`); not a real project id yet. */
+  projectId?: string;
   location?: string;
   /** Local date-time for a reminder, e.g. "2026-10-07T09:00". */
   reminder?: string;

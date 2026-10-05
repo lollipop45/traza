@@ -3,12 +3,9 @@
 import type { AssistantMessage } from "@/lib/assistant/types";
 import type { CalendarEvent, ISODate } from "@/lib/calendar/types";
 import type { InboxItem } from "@/lib/inbox/types";
-import type { Project } from "@/lib/projects/types";
 
-/** Mocked "now" for the whole app. */
+/** Mocked "now" for the screens that still use mock data (Calendar, Inbox, Assistant). */
 export const today: ISODate = "2026-10-05";
-
-export const activeProjectCount = 1;
 
 export const calendarEvents: CalendarEvent[] = [
   { id: "ev-01", title: "Taller de Proyectos", date: "2026-10-05", startTime: "10:00", endTime: "13:00", location: "Aula 3.2 · Arquitectura", course: "Taller de Proyectos", category: "arquitectura", kind: "event", projectId: "taller-proyectos", source: "manual" },
@@ -25,15 +22,16 @@ export const calendarEvents: CalendarEvent[] = [
   { id: "ev-12", title: "Entrega final", date: "2026-10-30", startTime: "12:00", course: "Taller de Proyectos", category: "arquitectura", kind: "deadline", projectId: "taller-proyectos", source: "manual" },
 ];
 
-/** Index order: the position defines each project's technical number (01, 02, …). */
-export const projects: Project[] = [
-  { id: "taller-proyectos", name: "Taller de Proyectos", area: "arquitectura", description: "Investigación territorial, vivienda experimental y desarrollo del proyecto en el Llano de Ucanca.", status: "active", progress: 68, createdAt: "2026-09-14", taskCount: 7, pendingTaskCount: 3, nextMilestoneEventId: "ev-07", tags: ["vivienda", "territorio"], source: "manual" },
-  { id: "dibujo-integrado-iii", name: "Taller de Dibujo Integrado III", area: "arquitectura", description: "Representación, levantamiento y desarrollo gráfico del proyecto.", status: "active", progress: 42, createdAt: "2026-09-15", taskCount: 5, pendingTaskCount: 2, nextMilestoneEventId: "ev-05", tags: ["representación"], source: "manual" },
-  { id: "astronomia", name: "Astronomía", area: "personal", description: "Observación, procesado de imágenes y estudio de instrumentación.", status: "active", progress: 35, createdAt: "2026-08-02", taskCount: 4, pendingTaskCount: 2, nextMilestoneEventId: "ev-11", tags: ["observación"], source: "manual" },
-  { id: "traza", name: "TRAZA", area: "programacion", description: "Desarrollo de la aplicación personal de productividad y acompañamiento universitario.", status: "active", progress: 25, createdAt: "2026-10-01", taskCount: 8, pendingTaskCount: 5, tags: ["producto"], source: "manual" },
-  { id: "portfolio", name: "Portfolio", area: "arquitectura", description: "Selección, edición y presentación de trabajos académicos.", status: "planned", progress: 10, createdAt: "2026-09-28", taskCount: 6, pendingTaskCount: 6, tags: ["edición"], source: "manual" },
-  { id: "archivo-academico", name: "Archivo académico", area: "universidad", description: "Documentación y trabajos cerrados de cursos anteriores.", status: "archived", progress: 100, createdAt: "2025-09-01", taskCount: 12, pendingTaskCount: 0, tags: ["archivo"], source: "manual" },
-];
+/**
+ * Names for the project slugs referenced by the mock calendar, inbox and assistant data. These are
+ * NOT real projects (those live in public.projects, with UUIDs); they only label mock content.
+ */
+export const mockProjectNames: Record<string, string> = {
+  "taller-proyectos": "Taller de Proyectos",
+  "dibujo-integrado-iii": "Taller de Dibujo Integrado III",
+  astronomia: "Astronomía",
+  traza: "TRAZA",
+};
 
 /** Most recent capture first. */
 export const inboxItems: InboxItem[] = [
