@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { SignOutButton } from "@/components/auth/SignOutButton";
 import { Wordmark } from "@/components/ui/Wordmark";
 import { formatCompactDate, isoWeekNumber } from "@/lib/calendar/dates";
 import type { ISODate } from "@/lib/calendar/types";
@@ -17,9 +18,13 @@ export function PageHeader({ title, subtitle, date, action }: PageHeaderProps) {
     <header>
       <div className="flex items-center justify-between">
         <Wordmark />
-        <span className="font-mono text-[11px] tracking-[0.12em] text-graphite">
-          SEM {isoWeekNumber(date)} · {formatCompactDate(date)}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="font-mono text-[11px] tracking-[0.12em] text-graphite">
+            SEM {isoWeekNumber(date)} · {formatCompactDate(date)}
+          </span>
+          <span aria-hidden className="h-3.5 w-px bg-charcoal/15" />
+          <SignOutButton />
+        </div>
       </div>
 
       <div className="mt-11 flex items-end justify-between gap-4 lg:mt-24">

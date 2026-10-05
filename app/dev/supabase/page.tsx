@@ -24,15 +24,25 @@ const verdicts: Record<SupabaseCheck["state"], { ok: boolean; title: string; bod
     title: "Conexión correcta · migración pendiente",
     body: "Supabase responde, pero la tabla public.tasks aún no existe. Aplica la migración (docs/supabase.md).",
   },
-  "access-blocked": {
+  "signed-out-blocked": {
     ok: true,
-    title: "Conexión correcta · acceso bloqueado por seguridad",
-    body: "La tabla existe y los privilegios/RLS deniegan el acceso sin sesión. Es el comportamiento esperado hasta la fase de autenticación.",
+    title: "Sin sesión · acceso bloqueado por seguridad",
+    body: "La tabla existe y la base de datos deniega el acceso anónimo. Inicia sesión en /login para comprobar el acceso autenticado.",
   },
-  readable: {
+  "signed-out-readable": {
+    ok: false,
+    title: "Alerta · acceso anónimo abierto",
+    body: "La consulta funcionó sin sesión. Revisa los privilegios de anon en public.tasks: no deberían existir.",
+  },
+  "signed-in-blocked": {
+    ok: false,
+    title: "Sesión válida · faltan privilegios",
+    body: "El usuario está autenticado, pero no puede leer tasks. Aplica la migración de privilegios (docs/supabase.md).",
+  },
+  "signed-in-readable": {
     ok: true,
-    title: "Conexión correcta · lectura permitida",
-    body: "La consulta se ejecutó; RLS limita las filas a las del usuario autenticado.",
+    title: "Sesión válida · acceso seguro a tasks",
+    body: "El usuario autenticado consulta public.tasks a través de RLS. foreignRows debe ser 0: solo se ven sus propias tareas.",
   },
 };
 
@@ -41,6 +51,8 @@ export default async function SupabaseDevPage() {
 
   const result = await checkSupabase();
   const verdict = verdicts[result.state];
+  // Any visible row owned by someone else means RLS is broken.
+  const ok = verdict.ok && !("foreignRows" in result && result.foreignRows > 0);
   const details = Object.entries(result).filter(([key]) => key !== "state");
 
   return (
@@ -53,7 +65,7 @@ export default async function SupabaseDevPage() {
         {[["state", result.state], ...details].map(([key, value]) => (
           <div key={key} className="flex justify-between border-b border-charcoal/10 py-2.5">
             <dt className="uppercase tracking-[0.14em] text-graphite">{key}</dt>
-            <dd className={key === "state" ? (verdict.ok ? "text-charcoal" : "text-charcoal underline") : ""}>
+            <dd className={key === "state" ? (ok ? "text-charcoal" : "text-charcoal underline") : ""}>
               {String(value)}
             </dd>
           </div>

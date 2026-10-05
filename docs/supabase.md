@@ -15,7 +15,24 @@ Ambas son públicas por diseño: lo que protege los datos es RLS, no la clave. *
 
 - `lib/supabase/server.ts` → `createClient()` asíncrono para Server Components, Server Actions y Route Handlers (cookies vía `next/headers`). Crear uno por petición.
 - `lib/supabase/client.ts` → `createClient()` para Client Components, solo cuando sea imprescindible.
-- Pendiente para la fase de autenticación: `proxy.ts` (Next 16 renombró `middleware.ts`) que refresca la sesión con `supabase.auth.getClaims()`.
+- `lib/supabase/proxy.ts` → `updateSession()`, usado por `proxy.ts` (Next 16 renombró `middleware.ts`).
+
+Ambos clientes usan el tipo generado `Database`.
+
+## Autenticación
+
+Correo + contraseña con Supabase Auth y sesiones en cookies (`@supabase/ssr`). Sin registro público ni proveedores OAuth.
+
+- `proxy.ts` → en cada petición (salvo estáticos) refresca la sesión con `getClaims()` y aplica las rutas: sin sesión todo redirige a `/login`; con sesión, `/login` redirige a `/`. Rutas públicas en `lib/auth/routes.ts`.
+- `app/(app)/layout.tsx` → segunda capa: verifica las claims en el servidor (`requireUser()`) antes de renderizar Inicio, Calendario, Inbox, Proyectos y Asistente.
+- `lib/auth/actions.ts` → Server Actions `signIn` (mensaje de error único, no revela si el correo existe) y `signOut` (revoca la sesión de este dispositivo).
+- Identidad: siempre `getClaims()` (JWT verificado), nunca `getSession()`.
+- Las Server Actions que lean o escriban datos deben llamar a `requireUser()`: el proxy no basta.
+
+### Pasos en el panel de Supabase
+
+1. **Authentication → Sign In / Providers → Email**: desactivar *Allow new users to sign up* (la API pública permitiría registrarse aunque no haya página `/signup`).
+2. **Authentication → Users → Add user → Create new user**: correo + contraseña, marcando *Auto Confirm User*.
 
 ## Migraciones
 
@@ -44,12 +61,12 @@ Después, tipar los clientes: `createServerClient<Database>(…)` y `createBrows
 
 ## Comprobación
 
-Con `npm run dev`, abrir `/dev/supabase` (solo existe en desarrollo). Distingue: configuración ausente · sin conexión · conexión correcta con migración pendiente · conexión correcta con acceso bloqueado por seguridad (esperado sin sesión) · lectura permitida. Ruta temporal: borrar `app/dev/` cuando haya datos reales en la interfaz.
+Con `npm run dev`, abrir `/dev/supabase` (solo existe en desarrollo). Distingue: configuración ausente · sin conexión · migración pendiente · sin sesión con acceso bloqueado (esperado) · alerta si el acceso anónimo funciona · sesión sin privilegios (falta la migración de privilegios) · sesión con acceso seguro (`foreignRows` debe ser 0). Ruta temporal: borrar `app/dev/` cuando haya datos reales en la interfaz.
 
 ## Estado de la migración a datos reales
 
 | Entidad | Estado |
 | --- | --- |
-| Tareas (`public.tasks`) | Esquema, RLS e índices definidos. Solo lectura para usuarios autenticados; sin escrituras desde la app. La interfaz sigue usando datos mock. |
+| Tareas (`public.tasks`) | Esquema, RLS e índices. Usuarios autenticados: lectura, borrado, y alta/edición solo de columnas de contenido (`id`, `user_id`, `created_at`, `updated_at` los fija la BD). `anon` sin acceso. La interfaz sigue usando datos mock. |
 | Proyectos, calendario, inbox, asistente | Solo datos mock (`lib/mock-data.ts`). |
-| Autenticación | No implementada. Siguiente fase: `proxy.ts`, inicio de sesión y `grant insert, update, delete on public.tasks to authenticated` (las políticas de escritura ya existen). |
+| Autenticación | Implementada (correo + contraseña, un usuario creado a mano). |
