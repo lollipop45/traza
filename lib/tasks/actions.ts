@@ -3,47 +3,64 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
-import { TASK_TITLE_MAX_LENGTH } from "./types";
+import { isTaskId, parseTaskDetails } from "./validation";
 
-// Mutations never accept a user_id: ownership comes from the verified session. The column is not
-// even writable by `authenticated` (column-scoped grants); the database fills it with auth.uid()
-// and RLS checks it. Errors are mapped to fixed Spanish messages and never logged or echoed.
+// Every mutation: verifies the session, validates its input here on the server, and relies on RLS
+// for ownership. None accepts a user_id; the column is not even writable by `authenticated`
+// (column-scoped grants) and the database fills it with auth.uid(). Only the editable fields
+// (title, due_date, priority, status/completed_at) are ever written. Errors become fixed Spanish
+// messages and are never logged or echoed.
+
+const HOME_PATH = "/";
 
 export type CreateTaskState = {
   error: string | null;
   /** Echoed back so the text survives a failed attempt; empty after success so the field clears. */
   title: string;
+  /** Increments on every successful create, so the form can reset its option controls. */
+  created: number;
 };
 
-export async function createTask(_previous: CreateTaskState, formData: FormData): Promise<CreateTaskState> {
+export async function createTask(previous: CreateTaskState, formData: FormData): Promise<CreateTaskState> {
   await requireUser();
 
-  const raw = formData.get("title");
-  const title = typeof raw === "string" ? raw.trim() : "";
-
-  if (!title) return { error: "Escribe la tarea antes de guardarla.", title: "" };
-  // Count code points, as Postgres char_length() does.
-  if ([...title].length > TASK_TITLE_MAX_LENGTH) {
-    return { error: `La tarea no puede superar los ${TASK_TITLE_MAX_LENGTH} caracteres.`, title };
-  }
+  const parsed = parseTaskDetails(formData);
+  const rawTitle = formData.get("title");
+  const echo = typeof rawTitle === "string" ? rawTitle : "";
+  if (!parsed.ok) return { ...previous, error: parsed.error, title: echo };
 
   const supabase = await createClient();
-  // status, priority, source, due_date, user_id, timestamps: database defaults.
-  const { error } = await supabase.from("tasks").insert({ title });
-  if (error) return { error: "No se ha podido crear la tarea.", title };
+  // status, source, user_id and timestamps come from database defaults; project_id stays null.
+  const { error } = await supabase.from("tasks").insert(parsed.value);
+  if (error) return { ...previous, error: "No se ha podido crear la tarea.", title: echo };
 
-  revalidatePath("/");
-  return { error: null, title: "" };
+  revalidatePath(HOME_PATH);
+  return { error: null, title: "", created: previous.created + 1 };
 }
 
-export type UpdateTaskResult = { ok: true } | { ok: false; error: string };
+export type TaskMutationResult = { ok: true } | { ok: false; error: string };
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-export async function setTaskCompleted(taskId: string, completed: boolean): Promise<UpdateTaskResult> {
+export async function updateTask(taskId: string, formData: FormData): Promise<TaskMutationResult> {
   await requireUser();
-  const failed: UpdateTaskResult = { ok: false, error: "No se ha podido actualizar la tarea." };
-  if (typeof taskId !== "string" || !UUID.test(taskId) || typeof completed !== "boolean") return failed;
+  const failed: TaskMutationResult = { ok: false, error: "No se ha podido actualizar la tarea." };
+  if (!isTaskId(taskId)) return failed;
+
+  const parsed = parseTaskDetails(formData);
+  if (!parsed.ok) return { ok: false, error: parsed.error };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("tasks").update(parsed.value).eq("id", taskId).select("id");
+  // Zero rows: the task does not exist or belongs to someone else (filtered out by RLS).
+  if (error || data.length === 0) return failed;
+
+  revalidatePath(HOME_PATH);
+  return { ok: true };
+}
+
+export async function setTaskCompleted(taskId: string, completed: boolean): Promise<TaskMutationResult> {
+  await requireUser();
+  const failed: TaskMutationResult = { ok: false, error: "No se ha podido actualizar la tarea." };
+  if (!isTaskId(taskId) || typeof completed !== "boolean") return failed;
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -55,10 +72,21 @@ export async function setTaskCompleted(taskId: string, completed: boolean): Prom
     )
     .eq("id", taskId)
     .select("id");
-
-  // Zero rows means the task does not exist or belongs to someone else (filtered out by RLS).
   if (error || data.length === 0) return failed;
 
-  revalidatePath("/");
+  revalidatePath(HOME_PATH);
+  return { ok: true };
+}
+
+export async function deleteTask(taskId: string): Promise<TaskMutationResult> {
+  await requireUser();
+  const failed: TaskMutationResult = { ok: false, error: "No se ha podido eliminar la tarea." };
+  if (!isTaskId(taskId)) return failed;
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("tasks").delete().eq("id", taskId).select("id");
+  if (error || data.length === 0) return failed;
+
+  revalidatePath(HOME_PATH);
   return { ok: true };
 }

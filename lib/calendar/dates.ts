@@ -17,6 +17,24 @@ export function isValidISODate(value: string): value is ISODate {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) && toISODate(parseISODate(value)) === value;
 }
 
+/**
+ * Time zone that defines "today" for real data (tasks). Calendar dates are compared as plain
+ * YYYY-MM-DD strings, so this is the only place a time zone enters the picture.
+ */
+export const APP_TIME_ZONE = "Atlantic/Canary";
+
+/** Today's calendar date in `timeZone`, independent of the server's own zone (e.g. UTC on a host). */
+export function currentISODate(timeZone: string = APP_TIME_ZONE): ISODate {
+  // en-CA formats dates as YYYY-MM-DD.
+  return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+}
+
+export function addDays(iso: ISODate, days: number): ISODate {
+  const date = parseISODate(iso);
+  date.setUTCDate(date.getUTCDate() + days);
+  return toISODate(date);
+}
+
 export function daysBetween(from: ISODate, to: ISODate): number {
   return Math.round((parseISODate(to).getTime() - parseISODate(from).getTime()) / DAY_MS);
 }

@@ -1,13 +1,13 @@
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import type { ISODate } from "@/lib/calendar/types";
-import { formatDueLabel } from "@/lib/tasks/format";
-import { isDone, type HomeTask } from "@/lib/tasks/types";
+import type { HomeTask } from "@/lib/tasks/types";
 import { TaskItem } from "./TaskItem";
 
 type TaskListProps = {
   /** null when the tasks could not be loaded. */
   tasks: HomeTask[] | null;
   pendingCount: number | null;
+  /** Real current date (app time zone), for due labels. */
   today: ISODate;
 };
 
@@ -29,13 +29,7 @@ export function TaskList({ tasks, pendingCount, today }: TaskListProps) {
       ) : (
         <ul className="divide-y divide-charcoal/10">
           {tasks.map((task) => (
-            <TaskItem
-              key={task.id}
-              id={task.id}
-              title={task.title}
-              done={isDone(task)}
-              due={formatDueLabel(task.due_date, today)}
-            />
+            <TaskItem key={task.id} task={task} today={today} />
           ))}
         </ul>
       )}

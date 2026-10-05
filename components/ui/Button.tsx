@@ -19,17 +19,30 @@ type ButtonProps = {
   size?: keyof typeof sizes;
   type?: "button" | "submit";
   disabled?: boolean;
+  onClick?: () => void;
+  autoFocus?: boolean;
   children: ReactNode;
   /** Trailing icon, decorative. */
   icon?: LucideIcon;
 };
 
 /** Technical button with a mono uppercase label. */
-export function Button({ variant, size = "compact", type = "button", disabled, children, icon: Icon }: ButtonProps) {
+export function Button({
+  variant,
+  size = "compact",
+  type = "button",
+  disabled,
+  onClick,
+  autoFocus,
+  children,
+  icon: Icon,
+}: ButtonProps) {
   return (
     <button
       type={type}
       disabled={disabled}
+      onClick={onClick}
+      autoFocus={autoFocus}
       className={`inline-flex items-center gap-2 rounded-md font-mono text-[11px] uppercase tracking-[0.14em] outline-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sage disabled:cursor-wait disabled:opacity-60 ${sizes[size]} ${variants[variant]}`}
     >
       {children}
