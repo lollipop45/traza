@@ -1,6 +1,7 @@
 // Static placeholder content. Replaced by real sources in later phases.
 
 import type { CalendarEvent, ISODate } from "@/lib/calendar/types";
+import type { InboxItem } from "@/lib/inbox/types";
 
 export type Task = {
   id: string;
@@ -27,6 +28,16 @@ export const calendarEvents: CalendarEvent[] = [
   { id: "ev-10", title: "Entrega maqueta", date: "2026-10-23", startTime: "10:00", course: "Taller de Proyectos", category: "arquitectura", kind: "deadline", source: "manual" },
   { id: "ev-11", title: "Observación astronómica", date: "2026-10-26", startTime: "21:00", location: "Roque de los Muchachos", category: "astronomia", kind: "event", source: "manual" },
   { id: "ev-12", title: "Entrega final", date: "2026-10-30", startTime: "12:00", course: "Taller de Proyectos", category: "arquitectura", kind: "deadline", source: "manual" },
+];
+
+/** Most recent capture first. */
+export const inboxItems: InboxItem[] = [
+  { id: "in-01", type: "task", title: "Comprar cartón pluma", createdAt: "2026-10-05T09:40", dueDate: "2026-10-05", project: "Arquitectura", tags: ["maqueta"], source: "manual" },
+  { id: "in-02", type: "task", title: "Preguntar a Orlando por los detalles de la maqueta", createdAt: "2026-10-05T09:12", dueDate: "2026-10-06", project: "Taller de Dibujo", tags: ["maqueta"], source: "manual" },
+  { id: "in-03", type: "idea", title: "Vivienda experimental semienterrada en Ucanca", content: "Excavar en la ladera para aprovechar la inercia térmica del terreno.", createdAt: "2026-10-05T08:30", project: "Taller de Proyectos", tags: ["vivienda", "paisaje"], source: "manual" },
+  { id: "in-04", type: "note", title: "Investigar telescopios de campo amplio", createdAt: "2026-10-05T07:55", project: "Astronomía", tags: ["equipo"], source: "manual" },
+  { id: "in-05", type: "task", title: "Terminar módulo de autenticación", createdAt: "2026-10-04T22:10", dueDate: "2026-10-06", project: "Programación", tags: [], source: "manual" },
+  { id: "in-06", type: "note", title: "Posibles referencias arquitectónicas para el taller", createdAt: "2026-10-04T18:05", project: "Arquitectura", tags: ["referencias"], source: "manual" },
 ];
 
 export const tasks: Task[] = [

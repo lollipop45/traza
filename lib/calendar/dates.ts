@@ -49,6 +49,12 @@ export function formatShortMonth(iso: ISODate): string {
   return format(iso, { month: "short" }).replace(".", "").toUpperCase();
 }
 
+/** "5 OCT 2026" */
+export function formatShortDate(iso: ISODate): string {
+  const date = parseISODate(iso);
+  return `${date.getUTCDate()} ${formatShortMonth(iso)} ${date.getUTCFullYear()}`;
+}
+
 /** "05.10.26" */
 export function formatCompactDate(iso: ISODate): string {
   const [year, month, day] = iso.split("-");
