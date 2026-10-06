@@ -50,6 +50,16 @@ export function ProjectEntry({ project, number, action }: ProjectEntryProps) {
             </>
           )}
           <span className={statusClass[project.status] ?? "text-graphite"}>{projectStatusLabel(project.status)}</span>
+          {project.campusLinked && (
+            <>
+              <span aria-hidden className="px-2 text-graphite/50">
+                /
+              </span>
+              <span className="text-graphite" title="Vinculado a un curso de Campus Virtual">
+                Campus
+              </span>
+            </>
+          )}
         </p>
 
         {project.description && (

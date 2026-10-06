@@ -73,6 +73,50 @@ export type Database = {
           },
         ]
       }
+      canvas_course_links: {
+        Row: {
+          canvas_course_code: string | null
+          canvas_course_id: string
+          canvas_course_name: string | null
+          created_at: string
+          id: string
+          project_id: string | null
+          state: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          canvas_course_code?: string | null
+          canvas_course_id: string
+          canvas_course_name?: string | null
+          created_at?: string
+          id?: string
+          project_id?: string | null
+          state: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          canvas_course_code?: string | null
+          canvas_course_id?: string
+          canvas_course_name?: string | null
+          created_at?: string
+          id?: string
+          project_id?: string | null
+          state?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "canvas_course_links_project_owner_fkey"
+            columns: ["project_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id", "user_id"]
+          },
+        ]
+      }
       inbox_items: {
         Row: {
           content: string | null
@@ -220,7 +264,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      create_project_from_canvas_course: {
+        Args: {
+          p_area?: string
+          p_canvas_course_code?: string
+          p_canvas_course_id: string
+          p_canvas_course_name?: string
+          p_description?: string
+          p_name: string
+          p_status?: string
+        }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never

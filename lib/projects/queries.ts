@@ -1,5 +1,6 @@
 import "server-only";
 import { requireUser } from "@/lib/auth/session";
+import { getCanvasLinkedProjectIds } from "@/lib/canvas/links";
 import { createClient } from "@/lib/supabase/server";
 import { sortProjects, withTaskCounts } from "./projects";
 import {
@@ -23,13 +24,15 @@ export async function getProjectIndex(): Promise<ProjectIndexResult> {
   const user = await requireUser();
   const supabase = await createClient();
 
-  const [projects, tasks] = await Promise.all([
+  const [projects, tasks, campusLinked] = await Promise.all([
     supabase.from("projects").select(PROJECT_SUMMARY_COLUMNS).eq("user_id", user.id),
     supabase.from("tasks").select("project_id, status").eq("user_id", user.id).not("project_id", "is", null),
+    // Optional decoration: if the links cannot be read, projects still render (without CAMPUS labels).
+    getCanvasLinkedProjectIds(),
   ]);
 
   if (projects.error || tasks.error) return { ok: false };
-  return { ok: true, projects: sortProjects(withTaskCounts(projects.data, tasks.data)) };
+  return { ok: true, projects: sortProjects(withTaskCounts(projects.data, tasks.data, campusLinked ?? new Set())) };
 }
 
 export type ProjectOptionsResult = { ok: true; projects: ProjectOption[] } | { ok: false };

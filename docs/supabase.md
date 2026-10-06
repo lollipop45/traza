@@ -106,6 +106,8 @@ Obtener el token: en Campus Virtual → **Cuenta → Configuración → Integrac
 
 Comprobación: `/dev/canvas` (solo en desarrollo y con sesión de TRAZA) muestra la conexión, tu usuario de Canvas y tus cursos activos. Llamadas usadas: `GET /api/v1/users/self` y `GET /api/v1/courses?enrollment_state=active&include[]=term&per_page=100` (paginación por la cabecera `Link`). No se escribe nada en Supabase.
 
+**Vinculación de cursos** (`/projects/canvas`, enlace "Campus" en Proyectos): cada curso de Canvas se identifica por su **ID de Canvas**, nunca por el nombre. Para cada curso decides: vincularlo a un proyecto existente, crear un proyecto desde él (operación atómica, función `create_project_from_canvas_course`, SECURITY INVOKER) o ignorarlo. Las decisiones viven en `public.canvas_course_links` (`linked` con proyecto / `ignored` sin proyecto; sin fila = sin vincular), con instantánea del nombre y código del curso. Antes de guardar, el servidor vuelve a leer tus cursos de Canvas y solo acepta un ID que esté ahí; el nombre y el código salen de esa respuesta, nunca del navegador. Borrar un proyecto borra sus vínculos (el curso vuelve a "sin vincular"). El token de Canvas nunca se guarda en la base de datos.
+
 Si la universidad no permite tokens personales (el botón "Nuevo token de acceso" no aparece), la alternativa es OAuth2 con una *developer key* emitida por la administración de Canvas; no está implementado.
 
 ## Estado de la migración a datos reales
@@ -116,6 +118,8 @@ Si la universidad no permite tokens personales (el botón "Nuevo token de acceso
 | Proyectos (`public.projects`) | Reales en Proyectos (crear, editar, archivar, borrar) y en Inicio (proyectos activos, asignación de tareas). Recuentos de tareas derivados de `public.tasks`. |
 | Calendario (`public.calendar_events`) | Real: eventos (crear, editar, borrar) y entregas derivadas de `public.tasks`; navegación por mes en la URL (`?mes=&dia=`). Vistas Día y Semana aún sin implementar. |
 | Inbox (`public.inbox_items` + `public.tasks`) | Real: captura de tareas, ideas y notas; edición y borrado; filtros y recuentos reales. |
-| Canvas | Conexión de solo lectura (perfil y cursos activos) en `/dev/canvas`; sin importación ni datos en Supabase. |
+| Canvas · conexión | Completa: lectura de perfil y cursos activos (`/dev/canvas`). |
+| Canvas · vinculación de cursos | Completa: `public.canvas_course_links` + `/projects/canvas`; etiqueta CAMPUS en Proyectos. |
+| Canvas · entregas | No implementado: no se importan tareas, cuestionarios ni eventos. |
 | Asistente | Solo datos mock (`lib/mock-data.ts`). Sus `projectId` son slugs mock, no proyectos reales. |
 | Autenticación | Implementada (correo + contraseña, un usuario creado a mano). |

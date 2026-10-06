@@ -10,7 +10,11 @@ export const PROJECT_SUMMARY_COLUMNS = "id, name, area, description, status, pro
 /** Derived from `public.tasks`, never stored on the project. */
 export type ProjectTaskCounts = { taskCount: number; pendingTaskCount: number };
 
-export type ProjectWithCounts = ProjectSummary & ProjectTaskCounts;
+export type ProjectWithCounts = ProjectSummary &
+  ProjectTaskCounts & {
+    /** At least one Canvas course is linked to it (derived from canvas_course_links). */
+    campusLinked: boolean;
+  };
 
 /** What task forms and task rows need: the name to display and whether it is still assignable. */
 export type ProjectOption = Pick<ProjectRow, "id" | "name" | "status">;

@@ -80,11 +80,13 @@ export function countTasksByProject(
 export function withTaskCounts(
   projects: ProjectSummary[],
   tasks: Pick<TaskRow, "project_id" | "status">[],
+  campusLinkedIds: ReadonlySet<string> = new Set(),
 ): ProjectWithCounts[] {
   const counts = countTasksByProject(tasks);
   return projects.map((project) => ({
     ...project,
     ...(counts.get(project.id) ?? { taskCount: 0, pendingTaskCount: 0 }),
+    campusLinked: campusLinkedIds.has(project.id),
   }));
 }
 

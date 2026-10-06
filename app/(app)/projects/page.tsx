@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Plus } from "lucide-react";
+import Link from "next/link";
 import { AppShell } from "@/components/layout/AppShell";
 import { NewProjectForm } from "@/components/projects/NewProjectForm";
 import { ProjectIndex } from "@/components/projects/ProjectIndex";
@@ -60,12 +61,20 @@ export default async function ProjectsPage({ searchParams }: PageProps<"/project
             subtitle="Organiza tu trabajo por áreas y procesos."
             date={currentISODate()}
             action={
-              <OutlineIconButton
-                label={creating ? "Cerrar nuevo proyecto" : "Nuevo proyecto"}
-                icon={Plus}
-                iconClassName={`size-[18px] transition-transform ${creating ? "rotate-45" : ""}`}
-                href={projectsHref(activeFilter.slug, !creating)}
-              />
+              <div className="flex items-center gap-2">
+                <Link
+                  href="/projects/canvas"
+                  className="inline-flex h-9 items-center rounded-md border border-charcoal/15 px-3 font-mono text-[11px] uppercase tracking-[0.14em] text-charcoal outline-none transition-colors hover:bg-paper focus-visible:border-charcoal/40 focus-visible:bg-paper"
+                >
+                  Campus
+                </Link>
+                <OutlineIconButton
+                  label={creating ? "Cerrar nuevo proyecto" : "Nuevo proyecto"}
+                  icon={Plus}
+                  iconClassName={`size-[18px] transition-transform ${creating ? "rotate-45" : ""}`}
+                  href={projectsHref(activeFilter.slug, !creating)}
+                />
+              </div>
             }
           />
           {creating && <NewProjectForm closeHref={projectsHref(activeFilter.slug, false)} areas={areas} />}
