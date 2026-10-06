@@ -40,6 +40,7 @@ export function taskToDeadlineItem(task: DeadlineTask, projectNames: ProjectName
     date: task.due_date,
     projectName: task.project_id ? (projectNames.get(task.project_id) ?? null) : null,
     done: task.status === "done",
+    campus: task.source === "canvas",
   };
 }
 

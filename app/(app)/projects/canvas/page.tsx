@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { ArrowLeft } from "lucide-react";
 import type { ReactNode } from "react";
 import { CanvasCourseRow } from "@/components/canvas/CanvasCourseRow";
+import { AssignmentPreferenceRow } from "@/components/canvas/AssignmentPreferenceRow";
+import { CanvasSyncPanel } from "@/components/canvas/CanvasSyncPanel";
 import { AppShell } from "@/components/layout/AppShell";
 import { BlueprintBackdrop } from "@/components/ui/BlueprintBackdrop";
 import { OutlineIconButton } from "@/components/ui/OutlineIconButton";
@@ -11,6 +13,7 @@ import { currentISODate } from "@/lib/calendar/dates";
 import { getCanvasCourseLinks } from "@/lib/canvas/links";
 import { buildCourseMapping, proposedProjectName, type CanvasCourseLink } from "@/lib/canvas/mapping";
 import { getCanvasOverview } from "@/lib/canvas/queries";
+import { getCanvasAssignmentPreferences } from "@/lib/canvas/sync-store";
 import type { CanvasOverview } from "@/lib/canvas/read";
 import type { CanvasCourse } from "@/lib/canvas/types";
 import { getProjectOptions } from "@/lib/projects/queries";
@@ -36,7 +39,13 @@ function unavailableMessage(overview: Exclude<CanvasOverview, { state: "connecte
 
 export default async function CanvasMappingPage() {
   // Live Canvas courses (server-side, server-only token) + stored decisions + real projects.
-  const [overview, linkResult, projectResult] = await Promise.all([getCanvasOverview(), getCanvasCourseLinks(), getProjectOptions()]);
+  const [overview, linkResult, projectResult, preferences] = await Promise.all([
+    getCanvasOverview(),
+    getCanvasCourseLinks(),
+    getProjectOptions(),
+    // Stored per-assignment decisions; restoring needs no Canvas call, so they show even when Campus is down.
+    getCanvasAssignmentPreferences(),
+  ]);
   const projects = projectResult.ok ? projectResult.projects : [];
   const links = linkResult.ok ? linkResult.links : [];
   const projectsById = new Map(projects.map((project) => [project.id, project]));
@@ -69,6 +78,8 @@ export default async function CanvasMappingPage() {
           ) : (
             mapping && (
             <>
+              <CanvasSyncPanel linkedCount={mapping.linked.length} />
+
               <Section index="01" title="Sin vincular" count={mapping.unmapped.length} empty="Todos los cursos tienen una decisión.">
                 {mapping.unmapped.map(({ course, suggestion }, i) => (
                   <CanvasCourseRow
@@ -154,13 +165,45 @@ export default async function CanvasMappingPage() {
             </>
             )
           )}
+
+          {preferences && preferences.length > 0 && (
+            <details className="group">
+              <summary className="flex cursor-pointer list-none items-baseline justify-between border-b border-charcoal/10 pb-3 font-mono text-[11px] uppercase tracking-[0.14em] outline-none focus-visible:text-charcoal">
+                <span>
+                  <span className="mr-3 text-graphite">05</span>Entregas decididas por ti
+                </span>
+                <span className="text-graphite">
+                  <span className="group-open:hidden">Mostrar</span>
+                  <span className="hidden group-open:inline">Ocultar</span> · {String(preferences.length).padStart(2, "0")}
+                </span>
+              </summary>
+              <ol className="divide-y divide-charcoal/10">
+                {preferences.map((preference, i) => (
+                  <AssignmentPreferenceRow
+                    key={preference.id}
+                    number={i + 1}
+                    preferenceId={preference.id}
+                    name={preference.canvas_assignment_name ?? "Entrega de Campus"}
+                    state={preference.state === "included" ? "included" : "ignored"}
+                  />
+                ))}
+              </ol>
+            </details>
+          )}
         </div>
 
         <aside className="lg:col-span-4 lg:col-start-9 lg:row-start-2">
           <SectionHeader index="00" title="Cómo funciona" id="how-heading" />
           <p className="pt-4 text-[14px] leading-[1.55] text-graphite">
             Cada curso se identifica por su ID de Canvas, no por su nombre. Vincúlalo a un proyecto, crea uno nuevo desde el
-            curso o ignóralo. Nada se vincula automáticamente y todavía no se importan entregas.
+            curso o ignóralo. Nada se vincula automáticamente.
+          </p>
+          <p className="mt-3 text-[14px] leading-[1.55] text-graphite">
+            Al sincronizar, solo se importan como tareas las entregas con una acción real (subir un archivo, un texto,
+            un cuestionario, un foro, una entrega presencial con fecha…) de los cursos vinculados. Las columnas de notas
+            y la asistencia se omiten; lo dudoso queda en «Revisar» hasta que decidas. Campus decide el título, la fecha
+            y el proyecto; tú, la prioridad y si está hecha. Nada se borra solo: «Ignorar en TRAZA» quita una tarea de
+            Campus y evita que vuelva.
           </p>
           {mapping && (
             <p className="mt-4 font-mono text-[10px] uppercase tracking-[0.14em] text-graphite">

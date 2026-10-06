@@ -67,7 +67,7 @@ export function EventTimeline({ items, highlightFirst = false, editHref }: Event
                   <span className={`break-words ${isDone ? "text-graphite line-through" : ""}`}>{item.title}</span>
                   {isDeadline && (
                     <span className="font-mono text-[10px] font-normal uppercase tracking-[0.14em] text-graphite">
-                      {isDone ? "Tarea · Hecha" : "Tarea"}
+                      {["Tarea", item.campus && "Campus", isDone && "Hecha"].filter(Boolean).join(" · ")}
                     </span>
                   )}
                 </p>

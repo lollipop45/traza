@@ -66,3 +66,14 @@ export function parseTaskDetails(formData: FormData): Parsed<TaskDetails> {
   }
   return { ok: true, value: details };
 }
+
+/**
+ * The changes an edit may write, by the task's stored source. A Canvas task only accepts priority:
+ * its title, due date and project are Canvas-managed, so anything the browser sends for them is
+ * ignored (a crafted request cannot change them either). Manual tasks accept every editable field.
+ */
+export function parseTaskEdit(source: string, formData: FormData): Parsed<TaskDetails | Pick<TaskDetails, "priority">> {
+  if (source !== "canvas") return parseTaskDetails(formData);
+  const priority = parsePriority(formField(formData, "priority"));
+  return priority.ok ? { ok: true, value: { priority: priority.value } } : priority;
+}

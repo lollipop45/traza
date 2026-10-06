@@ -6,11 +6,13 @@
 import { Check, PencilLine } from "lucide-react";
 import { useRef, useState } from "react";
 import { TaskEditor } from "@/components/home/TaskEditor";
+import { CampusMark } from "@/components/tasks/CampusMark";
 import { useTaskCompletion } from "@/components/tasks/useTaskCompletion";
 import type { ISODate } from "@/lib/calendar/types";
 import { entryDateLabel, inboxTypeLabels } from "@/lib/inbox/feed";
 import type { InboxTaskEntry } from "@/lib/inbox/types";
 import type { ProjectOption } from "@/lib/projects/types";
+import { isCanvasTask } from "@/lib/tasks/types";
 
 type InboxTaskRowProps = {
   entry: InboxTaskEntry;
@@ -67,6 +69,11 @@ export function InboxTaskRow({ entry, today, projects }: InboxTaskRowProps) {
               {inboxTypeLabels.task} · {date.text}
             </span>
             {entry.projectName && <span className="text-[13px] text-graphite">{entry.projectName}</span>}
+            {isCanvasTask(task) && (
+              <span>
+                <CampusMark separated={false} />
+              </span>
+            )}
           </span>
           {error && (
             <span id={errorId} role="alert" className="mt-1 block text-[13px] text-charcoal">

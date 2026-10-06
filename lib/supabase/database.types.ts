@@ -73,6 +73,39 @@ export type Database = {
           },
         ]
       }
+      canvas_assignment_preferences: {
+        Row: {
+          canvas_assignment_id: string
+          canvas_assignment_name: string | null
+          canvas_course_id: string
+          created_at: string
+          id: string
+          state: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          canvas_assignment_id: string
+          canvas_assignment_name?: string | null
+          canvas_course_id: string
+          created_at?: string
+          id?: string
+          state: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          canvas_assignment_id?: string
+          canvas_assignment_name?: string | null
+          canvas_course_id?: string
+          created_at?: string
+          id?: string
+          state?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       canvas_course_links: {
         Row: {
           canvas_course_code: string | null
@@ -275,6 +308,22 @@ export type Database = {
           p_status?: string
         }
         Returns: string
+      }
+      set_canvas_assignment_preference: {
+        Args: {
+          p_canvas_assignment_id: string
+          p_canvas_assignment_name?: string
+          p_canvas_course_id: string
+          p_state: string
+        }
+        Returns: number
+      }
+      sync_canvas_course_tasks: {
+        Args: { p_assignments: Json; p_canvas_course_id: string }
+        Returns: {
+          assignment_id: string
+          outcome: string
+        }[]
       }
     }
     Enums: {

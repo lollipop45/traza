@@ -125,8 +125,8 @@ function event(n: number, date: string, start: string | null, extra: Partial<Cal
   };
 }
 
-function task(n: number, due: string | null, status = "pending", projectId: string | null = null): DeadlineTask {
-  return { id: id(200 + n), title: `Tarea ${n}`, status, due_date: due, project_id: projectId };
+function task(n: number, due: string | null, status = "pending", projectId: string | null = null, source = "manual"): DeadlineTask {
+  return { id: id(200 + n), title: `Tarea ${n}`, status, due_date: due, project_id: projectId, source };
 }
 
 describe("unified calendar items", () => {
@@ -148,8 +148,14 @@ describe("unified calendar items", () => {
 
   it("projects tasks with their real id and no invented time or place", () => {
     const item = taskToDeadlineItem(task(1, "2026-10-23", "done", id(2)), new Map(projects.map((p) => [p.id, p.name])));
-    assert.deepEqual(item, { itemType: "task-deadline", id: id(201), title: "Tarea 1", date: "2026-10-23", projectName: "Astronomía", done: true });
+    assert.deepEqual(item, { itemType: "task-deadline", id: id(201), title: "Tarea 1", date: "2026-10-23", projectName: "Astronomía", done: true, campus: false });
     assert.equal(taskToDeadlineItem(task(2, null), new Map()), null);
+  });
+
+  it("marks Canvas-imported deadlines as Campus (same task row, no copy)", () => {
+    const item = taskToDeadlineItem(task(3, "2026-10-12", "pending", id(1), "canvas"), new Map());
+    assert.equal(item?.campus, true);
+    assert.equal(item?.id, id(203));
   });
 
   it("merges both sources: deadlines, then all-day, then timed events by start", () => {

@@ -55,4 +55,6 @@ export type TaskDeadlineItem = {
   date: ISODate;
   projectName: string | null;
   done: boolean;
+  /** Imported from Campus Virtual (tasks.source = 'canvas'). */
+  campus: boolean;
 };

@@ -5,11 +5,12 @@
 // Action, then Home is revalidated.
 import { Check, PencilLine } from "lucide-react";
 import { useRef, useState } from "react";
+import { CampusMark } from "@/components/tasks/CampusMark";
 import { useTaskCompletion } from "@/components/tasks/useTaskCompletion";
 import type { ISODate } from "@/lib/calendar/types";
 import type { ProjectOption } from "@/lib/projects/types";
 import { formatDueLabel } from "@/lib/tasks/format";
-import type { HomeTask } from "@/lib/tasks/types";
+import { isCanvasTask, type HomeTask } from "@/lib/tasks/types";
 import { TaskEditor } from "./TaskEditor";
 
 const PRIORITY_MARKS: Partial<Record<string, { text: string; className: string }>> = {
@@ -33,6 +34,7 @@ export function TaskItem({ task, today, projects }: TaskItemProps) {
   const due = formatDueLabel(task.due_date, today);
   const priority = PRIORITY_MARKS[task.priority];
   const projectName = task.project_id ? projects.find((project) => project.id === task.project_id)?.name : undefined;
+  const campus = isCanvasTask(task);
 
   function closeEditor() {
     setEditing(false);
@@ -70,8 +72,11 @@ export function TaskItem({ task, today, projects }: TaskItemProps) {
           <span className="block text-[15px] font-medium tracking-[-0.01em] break-words transition-colors group-has-checked:text-graphite group-has-checked:line-through">
             {task.title}
           </span>
-          {projectName && (
-            <span className="mt-1 block text-[13px] break-words text-graphite">{projectName}</span>
+          {(projectName || campus) && (
+            <span className="mt-1 block text-[13px] break-words text-graphite">
+              {projectName}
+              {campus && <CampusMark separated={Boolean(projectName)} />}
+            </span>
           )}
           {priority && (
             <span

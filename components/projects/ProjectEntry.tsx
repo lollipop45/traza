@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { formatDayMonth } from "@/lib/calendar/dates";
 import { projectStatusLabel } from "@/lib/projects/projects";
 import type { ProjectWithCounts } from "@/lib/projects/types";
 import { ProgressLine } from "./ProgressLine";
@@ -79,8 +80,15 @@ export function ProjectEntry({ project, number, action }: ProjectEntryProps) {
           </Fact>
 
           <Fact term="Próximo hito">
-            {/* Milestones come from calendar events, which are not persistent yet. */}
-            <span className="text-graphite">Sin hito vinculado</span>
+            {/* Derived on read: earliest pending task due date or calendar event, today or later. */}
+            {project.nextMilestone ? (
+              <>
+                <span className="font-mono text-[11px] uppercase tracking-[0.12em]">{formatDayMonth(project.nextMilestone.date)}</span>
+                <span className="mt-0.5 block break-words text-graphite">{project.nextMilestone.title}</span>
+              </>
+            ) : (
+              <span className="text-graphite">Sin hito próximo</span>
+            )}
           </Fact>
         </dl>
       </div>

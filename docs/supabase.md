@@ -108,6 +108,53 @@ Comprobación: `/dev/canvas` (solo en desarrollo y con sesión de TRAZA) muestra
 
 **Vinculación de cursos** (`/projects/canvas`, enlace "Campus" en Proyectos): cada curso de Canvas se identifica por su **ID de Canvas**, nunca por el nombre. Para cada curso decides: vincularlo a un proyecto existente, crear un proyecto desde él (operación atómica, función `create_project_from_canvas_course`, SECURITY INVOKER) o ignorarlo. Las decisiones viven en `public.canvas_course_links` (`linked` con proyecto / `ignored` sin proyecto; sin fila = sin vincular), con instantánea del nombre y código del curso. Antes de guardar, el servidor vuelve a leer tus cursos de Canvas y solo acepta un ID que esté ahí; el nombre y el código salen de esa respuesta, nunca del navegador. Borrar un proyecto borra sus vínculos (el curso vuelve a "sin vincular"). El token de Canvas nunca se guarda en la base de datos.
 
+### Sincronización de entregas (manual)
+
+En `/projects/canvas`, bloque **Entregas de Campus**: **Vista previa** (lee Canvas y tus tareas, no escribe nada) y **Sincronizar Campus** (importa / actualiza). No hay sincronización automática ni en segundo plano.
+
+Flujo (`lib/canvas/sync.ts`, acciones en `lib/canvas/sync-actions.ts`):
+
+1. Verifica la sesión de TRAZA.
+2. Lee tus cursos activos de Canvas en el servidor y construye el conjunto de IDs reales.
+3. Carga tus vínculos y se queda con los `linked` cuyo curso está en ese conjunto. Un vínculo que Canvas ya no devuelve se omite, se informa y **se conserva**. Cursos ignorados o sin vincular nunca se sincronizan.
+4. Por curso: `GET /api/v1/courses/:id/assignments?include[]=submission&order_by=due_at&per_page=100`, todas las páginas (`Link`, mismo origen, límite de 20 páginas).
+5. Filtra y escribe con `sync_canvas_course_tasks` (lotes de 200). Un curso que falla no detiene los demás.
+
+**Filtro de relevancia** (hoy = día en Atlantic/Canary): nunca entregas no publicadas (`published = false` o `workflow_state` unpublished/deleted); con fecha, solo si vencen hoy − 30 días o después; sin fecha, solo si Canvas las creó en los últimos 180 días y no están cerradas (`lock_at`) antes de hoy. Las ilegibles (sin id, sin nombre, fecha que no es un instante con zona) se omiten y se cuentan.
+
+**Una entrega de Canvas no es automáticamente una tarea.** La API de entregas también devuelve columnas de notas ("NOTAS FINALES AUDS") y asistencia ("Roll Call Attendance"). Tras el filtro anterior, `lib/canvas/classify.ts` clasifica cada entrega con `submission_types` y el título normalizado (sin mayúsculas, acentos, signos ni etiquetas iniciales tipo "[C.E]"); gana la primera regla:
+
+1. Título exactamente "Roll Call Attendance" → **omitida** (asistencia).
+2. Título de notas ("Notas", "Calificaciones", o "Nota(s)/Calificación(es)" + final/parcial/media/global/definitiva/ordinaria/extraordinaria…) o de asistencia ("Asistencia", "Control de asistencia", "Attendance"…) **sin** entrega de estudiante → **omitida**; con entrega de estudiante → **revisar** (señales contradictorias). "Notas de campo" o "Entrega de notas" no cuentan como notas.
+3. Entrega de estudiante (`online_upload`, `online_text_entry`, `online_url`, `media_recording`, `student_annotation`, `online_quiz`, `discussion_topic`) → **se importa**.
+4. `external_tool` → se importa.
+5. `on_paper` → se importa con fecha (examen o entrega presencial); sin fecha → revisar.
+6. Solo `none` / `not_graded`, lista vacía, tipos desconocidos o sin `submission_types` → **revisar**. Nunca se importa en silencio.
+
+Las palabras "examen", "parcial", "práctica", "actividad" o "quiz" nunca excluyen nada. `grading_type`, `points_possible` y `omit_from_final_grade` se leen pero no deciden: un examen real puede no puntuar o quedar fuera de la nota final.
+
+**Decisiones por entrega** (`public.canvas_assignment_preferences`, `20261006082922`): `ignored` (no se importa nunca; ignorarla quita su tarea) o `included` (importar un elemento de "Revisar"); sin fila = clasificación automática. Identidad: usuario + curso + entrega de Canvas (IDs, nunca títulos), única; RLS de dueño; sin acceso anónimo. La función `set_canvas_assignment_preference` (SECURITY INVOKER) guarda la decisión y, al ignorar, borra en la misma transacción la tarea `canvas` del usuario con ese `external_id`; nunca una tarea manual. `sync_canvas_course_tasks` además se niega en la base de datos a recrear una entrega ignorada. "Restaurar" borra la decisión: no crea la tarea, la entrega vuelve a ser elegible en la siguiente vista previa / sincronización.
+
+La vista previa agrupa: **Revisar** (Importar / Ignorar), **Importadas · revisar** (tareas ya creadas que hoy no se importarían; nunca se borran solas: "Ignorar en TRAZA"), **Se importarán**, **Omitidas automáticamente** (con motivo) y un recuento de ignoradas por ti y antiguas. Las decisiones guardadas se ven en `/projects/canvas` › "Entregas decididas por ti". Importar / Ignorar desde la vista previa vuelve a leer la entrega en Canvas en el servidor; "Ignorar en TRAZA" desde una tarea usa su propio `external_id`.
+
+**Una entrega = una fila de `public.tasks`** (`source = 'canvas'`), sin tabla aparte: Inicio, Calendario, Inbox y los recuentos de Proyectos la muestran sin copias, con la marca discreta "CAMPUS". `external_id = course:<idCurso>:assignment:<idEntrega>`, construido por la base de datos; el índice único `(user_id, source, external_id)` impide duplicados (sincronizar diez veces deja una tarea por entrega, también con ejecuciones simultáneas: `INSERT … ON CONFLICT`).
+
+| Campo | Dueño |
+| --- | --- |
+| `title`, `due_date`, `project_id` | Canvas: se reescriben en cada sincronización (cambio de fecha, título o de proyecto vinculado al curso). |
+| `source`, `external_id` | Identidad: fijos. |
+| `priority`, `description` | Usuario: la sincronización nunca los toca. |
+| `status` / `completed_at` | Usuario, con una excepción: una tarea pendiente pasa a hecha si Canvas demuestra la entrega (`submitted_at` + estado `submitted` / `pending_review` / `graded`). Canvas nunca devuelve a pendiente una tarea hecha. |
+
+- **Fecha:** `due_at` (instante) se convierte al día en Atlantic/Canary (`2026-10-12T22:59:00Z` → 12 OCT). **Limitación:** la tarea guarda solo el día; la hora de cierre de Canvas no se conserva.
+- **Edición:** en una tarea de Campus el editor muestra título, fecha y proyecto como "Campus · Datos sincronizados"; solo cambian prioridad y completada (el servidor ignora el resto).
+- **Borrado:** una tarea de Campus no se borra sin más (la siguiente sincronización la recrearía): "Ignorar en TRAZA" registra la entrega como ignorada y quita la tarea a la vez.
+- **Desaparición:** si Canvas deja de devolver una entrega, su tarea queda intacta. Nada se borra por ausencia. Desvincular o ignorar un curso tampoco borra sus tareas.
+
+**Escritura y confianza** (`20261006070920_sync_canvas_course_tasks.sql`): los clientes siguen sin poder escribir `source` / `external_id`. La única vía es la función `sync_canvas_course_tasks(p_canvas_course_id, p_assignments)`, SECURITY DEFINER con `search_path = ''`, ejecutable solo por `authenticated`. Exige `auth.uid()`, no acepta `user_id` ni `project_id` (el proyecto sale del vínculo del propio usuario), solo inserta/actualiza filas `canvas` del llamante y respeta la clave compuesta tarea → proyecto. La base de datos no puede llamar a Canvas: la verificación del contenido la hace el servidor de Next.js. Un usuario que llamara a la RPC con datos inventados solo podría crear o retitular tareas de Campus **suyas**, en **sus** proyectos vinculados; nunca datos de otro usuario ni tareas manuales.
+
+**Proyectos · próximo hito:** se deriva al leer (no se guarda): la tarea pendiente con fecha ≥ hoy o el evento del calendario ≥ hoy del proyecto, el más próximo; el mismo día gana la tarea.
+
 Si la universidad no permite tokens personales (el botón "Nuevo token de acceso" no aparece), la alternativa es OAuth2 con una *developer key* emitida por la administración de Canvas; no está implementado.
 
 ## Estado de la migración a datos reales
@@ -120,6 +167,7 @@ Si la universidad no permite tokens personales (el botón "Nuevo token de acceso
 | Inbox (`public.inbox_items` + `public.tasks`) | Real: captura de tareas, ideas y notas; edición y borrado; filtros y recuentos reales. |
 | Canvas · conexión | Completa: lectura de perfil y cursos activos (`/dev/canvas`). |
 | Canvas · vinculación de cursos | Completa: `public.canvas_course_links` + `/projects/canvas`; etiqueta CAMPUS en Proyectos. |
-| Canvas · entregas | No implementado: no se importan tareas, cuestionarios ni eventos. |
+| Canvas · entregas | Completa tras aplicar `20261006070920`: sincronización manual con vista previa en `/projects/canvas`; las entregas son tareas reales (`source = 'canvas'`). Clasificación (importar / revisar / omitir) y decisiones por entrega tras aplicar `20261006082922`. |
+| Canvas · sincronización automática | No implementada (sin cron ni segundo plano). Tampoco anuncios, módulos, archivos, foros ni eventos del calendario de Canvas. |
 | Asistente | Solo datos mock (`lib/mock-data.ts`). Sus `projectId` son slugs mock, no proyectos reales. |
 | Autenticación | Implementada (correo + contraseña, un usuario creado a mano). |

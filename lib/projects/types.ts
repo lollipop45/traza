@@ -10,10 +10,17 @@ export const PROJECT_SUMMARY_COLUMNS = "id, name, area, description, status, pro
 /** Derived from `public.tasks`, never stored on the project. */
 export type ProjectTaskCounts = { taskCount: number; pendingTaskCount: number };
 
+/**
+ * The project's next dated thing, derived on read (never stored): its earliest pending task due
+ * today or later, or its earliest calendar event today or later, whichever comes first.
+ */
+export type ProjectMilestone = { kind: "task" | "event"; title: string; date: string };
+
 export type ProjectWithCounts = ProjectSummary &
   ProjectTaskCounts & {
     /** At least one Canvas course is linked to it (derived from canvas_course_links). */
     campusLinked: boolean;
+    nextMilestone: ProjectMilestone | null;
   };
 
 /** What task forms and task rows need: the name to display and whether it is still assignable. */

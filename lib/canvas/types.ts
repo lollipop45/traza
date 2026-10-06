@@ -66,3 +66,39 @@ export type CanvasCourse = {
   /** Canvas hides the course contents outside its access dates. */
   accessRestricted: boolean;
 };
+
+/** The requesting student's own submission (`include[]=submission`), when Canvas returns one. */
+export type CanvasSubmission = {
+  /** "unsubmitted", "submitted", "pending_review", "graded", … */
+  workflowState: string | null;
+  /** ISO instant; null when nothing was handed in. */
+  submittedAt: string | null;
+  excused: boolean;
+};
+
+export type CanvasAssignment = {
+  /** Stable Canvas assignment id (string-id mode). */
+  id: string;
+  /** The course it was read from (verified against the response's own course_id). */
+  courseId: string;
+  name: string;
+  /** ISO instant with an explicit offset; for students, already the date that applies to them. */
+  dueAt: string | null;
+  unlockAt: string | null;
+  lockAt: string | null;
+  /** Null when the installation does not report it (students normally only see published ones). */
+  published: boolean | null;
+  workflowState: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+  submission: CanvasSubmission | null;
+  /**
+   * How the student hands it in ("online_upload", "on_paper", "none", …), lowercased. Null when
+   * Canvas did not send a list: the classifier then treats the type as unknown.
+   */
+  submissionTypes: string[] | null;
+  /** "points", "percent", "pass_fail", "letter_grade", "gpa_scale", "not_graded". */
+  gradingType: string | null;
+  pointsPossible: number | null;
+  omitFromFinalGrade: boolean | null;
+};

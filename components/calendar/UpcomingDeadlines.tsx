@@ -1,3 +1,4 @@
+import { CampusMark } from "@/components/tasks/CampusMark";
 import { DeadlineMark } from "@/components/ui/DeadlineMark";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { daysBetween, formatShortMonth, parseISODate } from "@/lib/calendar/dates";
@@ -55,7 +56,12 @@ export function UpcomingDeadlines({ deadlines, today }: UpcomingDeadlinesProps) 
 
                 <div className="min-w-0 pl-2">
                   <p className="text-[15px] leading-[22px] font-medium tracking-[-0.01em] break-words">{deadline.title}</p>
-                  {deadline.projectName && <p className="mt-1 text-[13px] text-graphite">{deadline.projectName}</p>}
+                  {(deadline.projectName || deadline.campus) && (
+                    <p className="mt-1 text-[13px] text-graphite">
+                      {deadline.projectName}
+                      {deadline.campus && <CampusMark separated={Boolean(deadline.projectName)} />}
+                    </p>
+                  )}
                 </div>
 
                 <span

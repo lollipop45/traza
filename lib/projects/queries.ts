@@ -1,8 +1,9 @@
 import "server-only";
 import { requireUser } from "@/lib/auth/session";
+import { currentISODate } from "@/lib/calendar/dates";
 import { getCanvasLinkedProjectIds } from "@/lib/canvas/links";
 import { createClient } from "@/lib/supabase/server";
-import { sortProjects, withTaskCounts } from "./projects";
+import { nextMilestones, sortProjects, withTaskCounts } from "./projects";
 import {
   PROJECT_OPTION_COLUMNS,
   PROJECT_SUMMARY_COLUMNS,
@@ -16,23 +17,31 @@ import {
 export type ProjectIndexResult = { ok: true; projects: ProjectWithCounts[] } | { ok: false };
 
 /**
- * Every project of the signed-in user in index order, with task counts derived from
- * `public.tasks` (only `project_id` and `status` are read). Filtering by status happens on
- * this list, so the filter counts and the visual numbers always agree.
+ * Every project of the signed-in user in index order, with task counts and the next milestone
+ * derived from `public.tasks` and `public.calendar_events` (never stored on the project).
+ * Filtering by status happens on this list, so the filter counts and the visual numbers always agree.
  */
 export async function getProjectIndex(): Promise<ProjectIndexResult> {
   const user = await requireUser();
   const supabase = await createClient();
+  const today = currentISODate();
 
-  const [projects, tasks, campusLinked] = await Promise.all([
+  const [projects, tasks, events, campusLinked] = await Promise.all([
     supabase.from("projects").select(PROJECT_SUMMARY_COLUMNS).eq("user_id", user.id),
-    supabase.from("tasks").select("project_id, status").eq("user_id", user.id).not("project_id", "is", null),
+    supabase.from("tasks").select("id, project_id, status, due_date, title").eq("user_id", user.id).not("project_id", "is", null),
+    supabase
+      .from("calendar_events")
+      .select("id, project_id, event_date, title")
+      .eq("user_id", user.id)
+      .not("project_id", "is", null)
+      .gte("event_date", today),
     // Optional decoration: if the links cannot be read, projects still render (without CAMPUS labels).
     getCanvasLinkedProjectIds(),
   ]);
 
-  if (projects.error || tasks.error) return { ok: false };
-  return { ok: true, projects: sortProjects(withTaskCounts(projects.data, tasks.data, campusLinked ?? new Set())) };
+  if (projects.error || tasks.error || events.error) return { ok: false };
+  const milestones = nextMilestones(tasks.data, events.data, today);
+  return { ok: true, projects: sortProjects(withTaskCounts(projects.data, tasks.data, campusLinked ?? new Set(), milestones)) };
 }
 
 export type ProjectOptionsResult = { ok: true; projects: ProjectOption[] } | { ok: false };

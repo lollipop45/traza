@@ -1,7 +1,9 @@
+import type { CalendarEventRow, ISODate } from "@/lib/calendar/types";
 import type { TaskRow } from "@/lib/tasks/types";
 import {
   PROJECT_STATUSES,
   isProjectStatus,
+  type ProjectMilestone,
   type ProjectOption,
   type ProjectStatus,
   type ProjectSummary,
@@ -77,16 +79,52 @@ export function countTasksByProject(
   return counts;
 }
 
+export type MilestoneTask = Pick<TaskRow, "id" | "project_id" | "status" | "due_date" | "title">;
+export type MilestoneEvent = Pick<CalendarEventRow, "id" | "project_id" | "event_date" | "title">;
+
+type RankedMilestone = ProjectMilestone & { id: string };
+
+/** Same-day order: task deadlines before events (as in the calendar), then title, then id. */
+function compareMilestones(a: RankedMilestone, b: RankedMilestone): number {
+  return (
+    a.date.localeCompare(b.date) ||
+    (a.kind === b.kind ? 0 : a.kind === "task" ? -1 : 1) ||
+    a.title.localeCompare(b.title, "es") ||
+    a.id.localeCompare(b.id)
+  );
+}
+
+/**
+ * Each project's next milestone: the earliest of its pending tasks due today or later and its
+ * calendar events today or later. Overdue or completed tasks and past events are not "next".
+ */
+export function nextMilestones(tasks: MilestoneTask[], events: MilestoneEvent[], today: ISODate): Map<string, ProjectMilestone> {
+  const best = new Map<string, RankedMilestone>();
+  const consider = (projectId: string | null, candidate: RankedMilestone) => {
+    if (!projectId || candidate.date < today) return;
+    const current = best.get(projectId);
+    if (!current || compareMilestones(candidate, current) < 0) best.set(projectId, candidate);
+  };
+  for (const task of tasks) {
+    if (task.status === "done" || !task.due_date) continue;
+    consider(task.project_id, { kind: "task", title: task.title, date: task.due_date, id: task.id });
+  }
+  for (const event of events) consider(event.project_id, { kind: "event", title: event.title, date: event.event_date, id: event.id });
+  return new Map([...best].map(([projectId, { kind, title, date }]) => [projectId, { kind, title, date }]));
+}
+
 export function withTaskCounts(
   projects: ProjectSummary[],
   tasks: Pick<TaskRow, "project_id" | "status">[],
   campusLinkedIds: ReadonlySet<string> = new Set(),
+  milestones: ReadonlyMap<string, ProjectMilestone> = new Map(),
 ): ProjectWithCounts[] {
   const counts = countTasksByProject(tasks);
   return projects.map((project) => ({
     ...project,
     ...(counts.get(project.id) ?? { taskCount: 0, pendingTaskCount: 0 }),
     campusLinked: campusLinkedIds.has(project.id),
+    nextMilestone: milestones.get(project.id) ?? null,
   }));
 }
 

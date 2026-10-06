@@ -1,6 +1,8 @@
+import { fetchCourseAssignments } from "./assignments";
 import { createCanvasClient, type CanvasClientOptions } from "./client";
 import type { CanvasConfigResult } from "./env";
 import { parseCourses, parseProfile, selectActiveCourses } from "./parse";
+import type { AssignmentsRead } from "./sync";
 import { CanvasError, type CanvasCourse, type CanvasErrorKind, type CanvasProfile } from "./types";
 
 // Read-only Canvas overview, independent of Next.js so it can be tested with a mock server.
@@ -27,6 +29,25 @@ export const ACTIVE_COURSE_PARAMS = {
   enrollment_state: "active",
   "include[]": ["term"],
 } as const;
+
+/**
+ * Assignments of one course (every page). Never throws: any failure becomes `{ ok: false }` with no
+ * details (the caller reports the course as failed). The course id must already be verified
+ * against the live course list; it is also re-checked to be digits only before building the path.
+ */
+export async function readCourseAssignments(
+  configResult: CanvasConfigResult,
+  courseId: string,
+  options: CanvasClientOptions = {},
+): Promise<AssignmentsRead> {
+  if (!configResult.ok) return { ok: false };
+  try {
+    return { ok: true, ...(await fetchCourseAssignments(createCanvasClient(configResult.config, options), courseId)) };
+  } catch {
+    // Discarded: errors carry no secrets, but nothing about the failure is useful to the browser.
+    return { ok: false };
+  }
+}
 
 /** Never throws: every failure becomes a categorised state with no sensitive details. */
 export async function readCanvasOverview(configResult: CanvasConfigResult, options: CanvasClientOptions = {}): Promise<CanvasOverview> {

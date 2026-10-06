@@ -77,7 +77,7 @@ describe("capture parsing", () => {
 });
 
 function task(n: number, createdAt: string, extra: Partial<InboxTask> = {}): InboxTask {
-  return { id: id(100 + n), title: `Tarea ${n}`, status: "pending", priority: "normal", due_date: null, completed_at: null, project_id: null, created_at: createdAt, ...extra };
+  return { id: id(100 + n), title: `Tarea ${n}`, status: "pending", priority: "normal", due_date: null, completed_at: null, project_id: null, source: "manual", created_at: createdAt, ...extra };
 }
 
 function capture(n: number, kind: string, createdAt: string, extra: Partial<InboxCapture> = {}): InboxCapture {
