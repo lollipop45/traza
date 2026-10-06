@@ -150,6 +150,51 @@ export type Database = {
           },
         ]
       }
+      google_calendar_connections: {
+        Row: {
+          access_token_ciphertext: string | null
+          access_token_expires_at: string | null
+          connected_at: string
+          created_at: string
+          google_account_email: string | null
+          id: string
+          refresh_token_ciphertext: string | null
+          selected_calendar_id: string | null
+          selected_calendar_name: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token_ciphertext?: string | null
+          access_token_expires_at?: string | null
+          connected_at?: string
+          created_at?: string
+          google_account_email?: string | null
+          id?: string
+          refresh_token_ciphertext?: string | null
+          selected_calendar_id?: string | null
+          selected_calendar_name?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          access_token_ciphertext?: string | null
+          access_token_expires_at?: string | null
+          connected_at?: string
+          created_at?: string
+          google_account_email?: string | null
+          id?: string
+          refresh_token_ciphertext?: string | null
+          selected_calendar_id?: string | null
+          selected_calendar_name?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       inbox_items: {
         Row: {
           content: string | null
@@ -308,6 +353,14 @@ export type Database = {
           p_status?: string
         }
         Returns: string
+      }
+      get_google_calendar_credentials: {
+        Args: never
+        Returns: {
+          access_token_ciphertext: string
+          access_token_expires_at: string
+          refresh_token_ciphertext: string
+        }[]
       }
       set_canvas_assignment_preference: {
         Args: {

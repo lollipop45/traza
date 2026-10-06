@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { CalendarToolbar } from "@/components/calendar/CalendarToolbar";
 import { DayAgenda } from "@/components/calendar/DayAgenda";
 import { EventForm } from "@/components/calendar/EventForm";
+import { GoogleCalendarSection } from "@/components/calendar/GoogleCalendarSection";
 import { MonthCalendar } from "@/components/calendar/MonthCalendar";
 import { UpcomingDeadlines } from "@/components/calendar/UpcomingDeadlines";
 import { AppShell } from "@/components/layout/AppShell";
@@ -12,6 +13,8 @@ import { buildCalendarItems, itemsOn, upcomingDeadlines } from "@/lib/calendar/i
 import { getEventsBetween } from "@/lib/calendar/queries";
 import { isEventId } from "@/lib/calendar/validation";
 import { calendarHref, lastDayOfMonth, resolveCalendarView } from "@/lib/calendar/view";
+import { CALLBACK_MESSAGES, isCallbackCode, isCallbackStage } from "@/lib/google-calendar/connection";
+import { getGoogleCalendarStatus } from "@/lib/google-calendar/queries";
 import { getProjectOptions } from "@/lib/projects/queries";
 import { getPendingDeadlineTasks, getTasksDueBetween } from "@/lib/tasks/queries";
 
@@ -26,19 +29,27 @@ function plural(count: number, one: string, many: string): string {
 export default async function CalendarPage({ searchParams }: PageProps<"/calendar">) {
   // Navigation lives in the URL (?mes=YYYY-MM&dia=YYYY-MM-DD, plus ?nuevo or ?editar=<id> for the
   // event panel), so day cells and month arrows are plain links and no client state is needed.
-  const { mes, dia, nuevo, editar } = await searchParams;
+  const { mes, dia, nuevo, editar, google, google_error: googleError } = await searchParams;
   const today = currentISODate();
   const { month, selected } = resolveCalendarView({ mes, dia }, today);
   const view = { month, selected };
 
   // Two sources of truth, merged only for rendering: events (calendar_events) and task deadlines
   // (tasks.due_date, never copied into the events table).
-  const [eventResult, taskResult, pendingResult, projectResult] = await Promise.all([
+  const [eventResult, taskResult, pendingResult, projectResult, googleStatus] = await Promise.all([
     getEventsBetween(month, lastDayOfMonth(month)),
     getTasksDueBetween(month, lastDayOfMonth(month)),
     getPendingDeadlineTasks(),
     getProjectOptions(),
+    // Connection metadata only (no Google call): the page never waits on Google.
+    getGoogleCalendarStatus(),
   ]);
+  // ?google=<code> is set by the OAuth callback; only known codes are shown, never raw text. In
+  // development the callback also sends ?google_error=<stage> (a fixed list) to locate failures.
+  const diagnosticStage = process.env.NODE_ENV !== "production" && isCallbackStage(googleError) ? googleError : null;
+  const googleNotice = isCallbackCode(google)
+    ? { text: diagnosticStage ? `${CALLBACK_MESSAGES[google]} (Diagnóstico: ${diagnosticStage})` : CALLBACK_MESSAGES[google], success: google === "conectado" }
+    : null;
   const projects = projectResult.ok ? projectResult.projects : [];
   const items = eventResult.ok && taskResult.ok ? buildCalendarItems(eventResult.events, taskResult.tasks, projects) : null;
   const deadlines = pendingResult.ok ? upcomingDeadlines(pendingResult.tasks, projects) : null;
@@ -89,6 +100,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/calenda
             }
           />
           <UpcomingDeadlines deadlines={deadlines} today={today} />
+          <GoogleCalendarSection status={googleStatus} notice={googleNotice} />
         </div>
       </div>
     </AppShell>
