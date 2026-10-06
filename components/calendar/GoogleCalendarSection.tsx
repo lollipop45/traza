@@ -1,10 +1,11 @@
 "use client";
 
-// Google Calendar connection (no event sync yet). Receives connection METADATA only from the server
+// Google Calendar connection and manual sync. Receives connection METADATA only from the server
 // (state, account address, chosen calendar name): never a token. Every action is a Server Action;
 // "Conectar" is a form post that redirects to Google's consent screen.
 import { Check, Link2, Unlink } from "lucide-react";
 import { useState, useTransition } from "react";
+import { GoogleSyncPanel } from "@/components/calendar/GoogleSyncPanel";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { Button } from "@/components/ui/Button";
 import {
@@ -88,8 +89,7 @@ export function GoogleCalendarSection({ status, notice }: GoogleCalendarSectionP
 
         {status.state === "disconnected" && (
           <p className="max-w-[46ch] text-[14px] leading-[1.55] text-graphite">
-            Conecta tu cuenta de Google para que TRAZA pueda usar uno de tus calendarios más adelante. Todavía no se sincronizan
-            eventos.
+            Conecta tu cuenta de Google y elige uno de tus calendarios para sincronizarlo con TRAZA a mano.
           </p>
         )}
 
@@ -156,11 +156,15 @@ export function GoogleCalendarSection({ status, notice }: GoogleCalendarSectionP
           </p>
         )}
 
+        {status.state === "connected" && status.calendarName && !calendars?.ok && !confirmingDisconnect && <GoogleSyncPanel />}
+
         {confirmingDisconnect ? (
           <div role="group" aria-labelledby="google-disconnect" className="flex flex-col gap-3 border-t border-charcoal/10 pt-4">
             <p id="google-disconnect" className="text-[14px] leading-[1.5]">
               <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-charcoal">Desconectar Google Calendar</span>
-              <span className="mt-1 block text-graphite">TRAZA dejará de tener acceso a tu cuenta de Google. Tus eventos de TRAZA no se borran.</span>
+              <span className="mt-1 block text-graphite">
+                TRAZA dejará de tener acceso a tu cuenta de Google. No se borra nada: ni tus eventos de TRAZA ni lo que ya esté en Google.
+              </span>
             </p>
             <div className="flex flex-wrap gap-2">
               <Button variant="primary" onClick={confirmDisconnect} disabled={pending} icon={Unlink}>

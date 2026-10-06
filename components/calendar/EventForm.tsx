@@ -9,10 +9,12 @@ import { useState, useTransition, type FormEvent, type ReactNode } from "react";
 import { ProjectField } from "@/components/tasks/TaskFields";
 import { Button } from "@/components/ui/Button";
 import { createEvent, deleteEvent, updateEvent } from "@/lib/calendar/actions";
+import { formatShortDate } from "@/lib/calendar/dates";
 import {
   EVENT_DESCRIPTION_MAX_LENGTH,
   EVENT_LOCATION_MAX_LENGTH,
   EVENT_TITLE_MAX_LENGTH,
+  isGoogleEvent,
   type CalendarEventRecord,
   type ISODate,
 } from "@/lib/calendar/types";
@@ -29,9 +31,19 @@ type EventFormProps = {
   projects: ProjectOption[];
   /** Where "Cancelar" goes: the same day, without the panel. */
   closeHref: string;
+  /** Google Calendar is connected: deleting a TRAZA event also removes its Google copy on the next sync. */
+  googleConnected?: boolean;
 };
 
-export function EventForm({ mode, projects, closeHref }: EventFormProps) {
+export function EventForm(props: EventFormProps) {
+  // Google-origin events: Google owns the synced fields, so they are shown, not edited.
+  if (props.mode.kind === "edit" && isGoogleEvent(props.mode.event)) {
+    return <GoogleEventPanel event={props.mode.event} projects={props.projects} closeHref={props.closeHref} />;
+  }
+  return <TrazaEventForm {...props} />;
+}
+
+function TrazaEventForm({ mode, projects, closeHref, googleConnected = false }: EventFormProps) {
   const event = mode.kind === "edit" ? mode.event : null;
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -175,7 +187,10 @@ export function EventForm({ mode, projects, closeHref }: EventFormProps) {
         <div role="group" aria-labelledby={`${prefix}-delete`} className="flex flex-col gap-3 border-t border-charcoal/10 pt-4">
           <p id={`${prefix}-delete`} className="text-[14px] leading-[1.5]">
             <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-charcoal">Eliminar evento</span>
-            <span className="mt-1 block text-graphite">Esta acción no se puede deshacer.</span>
+            <span className="mt-1 block text-graphite">
+              Esta acción no se puede deshacer.
+              {googleConnected && " Si está en Google Calendar, su copia se quitará en la próxima sincronización."}
+            </span>
           </p>
           <div className="flex flex-wrap gap-2">
             <Button variant="primary" onClick={remove} disabled={pending} icon={Trash2}>
@@ -207,6 +222,77 @@ export function EventForm({ mode, projects, closeHref }: EventFormProps) {
           )}
         </div>
       )}
+    </form>
+  );
+}
+
+/**
+ * A Google-origin event: its synced data is read-only here (it is edited in Google Calendar and the
+ * next sync brings the change). Only the TRAZA project can be chosen. No delete: Google owns it.
+ */
+function GoogleEventPanel({ event, projects, closeHref }: { event: CalendarEventRecord; projects: ProjectOption[]; closeHref: string }) {
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const prefix = `google-event-${event.id}`;
+  const choices = projectChoices(projects, event.project_id);
+  const time = event.all_day ? "Todo el día" : [event.start_time?.slice(0, 5), event.end_time?.slice(0, 5)].filter(Boolean).join("–");
+
+  function submit(formEvent: FormEvent<HTMLFormElement>) {
+    formEvent.preventDefault();
+    const formData = new FormData(formEvent.currentTarget);
+    setError(null);
+    startTransition(async () => {
+      const result = await updateEvent(event.id, formData);
+      if (!result.ok) setError(result.error);
+    });
+  }
+
+  return (
+    <form onSubmit={submit} aria-labelledby={`${prefix}-heading`} aria-busy={pending} className="flex flex-col gap-4 border-y border-charcoal/10 py-5">
+      <h2 id={`${prefix}-heading`} className="font-mono text-[10px] uppercase tracking-[0.14em] text-charcoal">
+        Evento de Google
+      </h2>
+      <div className="flex flex-col gap-3">
+        <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-graphite">Google Calendar · Datos sincronizados</p>
+        <p className="text-[15px] leading-[22px] font-medium tracking-[-0.01em] break-words">{event.title}</p>
+        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[14px]">
+          <dt className="font-mono text-[10px] uppercase leading-[21px] tracking-[0.14em] text-graphite">Fecha</dt>
+          <dd>{formatShortDate(event.event_date)}</dd>
+          <dt className="font-mono text-[10px] uppercase leading-[21px] tracking-[0.14em] text-graphite">Hora</dt>
+          <dd className="font-mono text-[13px] leading-[21px] tabular-nums">{time}</dd>
+          {event.location && (
+            <>
+              <dt className="font-mono text-[10px] uppercase leading-[21px] tracking-[0.14em] text-graphite">Lugar</dt>
+              <dd className="break-words">{event.location}</dd>
+            </>
+          )}
+        </dl>
+        {event.description && <p className="max-w-[60ch] text-[13px] leading-[1.55] whitespace-pre-line break-words text-graphite">{event.description}</p>}
+        <p className="text-[13px] leading-[1.5] text-graphite">Se edita en Google Calendar: TRAZA lo actualiza al sincronizar.</p>
+      </div>
+
+      <ProjectField idPrefix={prefix} projects={choices} initial={event.project_id} />
+
+      {error && (
+        <p role="alert" className="border-l border-charcoal pl-3 text-[13px] leading-[1.5] text-charcoal">
+          {error}
+        </p>
+      )}
+
+      <div className="flex gap-2 pt-1">
+        {choices.length > 0 && (
+          <Button variant="primary" type="submit" disabled={pending} icon={Check}>
+            Guardar proyecto
+          </Button>
+        )}
+        <Link
+          href={closeHref}
+          scroll={false}
+          className="inline-flex h-9 items-center rounded-md border border-charcoal/15 px-3 font-mono text-[11px] uppercase tracking-[0.14em] text-charcoal outline-none transition-colors hover:bg-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sage"
+        >
+          Cerrar
+        </Link>
+      </div>
     </form>
   );
 }

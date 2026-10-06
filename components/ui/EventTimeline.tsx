@@ -1,6 +1,6 @@
 import { PencilLine } from "lucide-react";
 import Link from "next/link";
-import type { CalendarEventItem, CalendarItem } from "@/lib/calendar/types";
+import { GOOGLE_EVENT_SOURCE, type CalendarEventItem, type CalendarItem } from "@/lib/calendar/types";
 
 type EventTimelineProps = {
   items: CalendarItem[];
@@ -30,6 +30,7 @@ export function EventTimeline({ items, highlightFirst = false, editHref }: Event
         const isDone = isDeadline && item.done;
         const isHighlighted = highlightFirst && isFirst && !isDone;
         const time = item.itemType === "event" ? item.startTime : null;
+        const isGoogle = item.itemType === "event" && item.source === GOOGLE_EVENT_SOURCE;
         const secondary = details(item);
         return (
           <li key={`${item.itemType}-${item.id}`} className="grid grid-cols-[3.25rem_1.25rem_1fr]">
@@ -70,6 +71,14 @@ export function EventTimeline({ items, highlightFirst = false, editHref }: Event
                       {["Tarea", item.campus && "Campus", isDone && "Hecha"].filter(Boolean).join(" · ")}
                     </span>
                   )}
+                  {isGoogle && (
+                    <span className="font-mono text-[10px] font-normal uppercase tracking-[0.14em] text-graphite" title="Importado de Google Calendar">
+                      <span aria-hidden className="pr-2 text-graphite/50">
+                        /
+                      </span>
+                      Google
+                    </span>
+                  )}
                 </p>
                 {secondary && <p className="mt-1 text-[13px] break-words text-graphite">{secondary}</p>}
               </div>
@@ -77,8 +86,8 @@ export function EventTimeline({ items, highlightFirst = false, editHref }: Event
                 <Link
                   href={editHref(item)}
                   scroll={false}
-                  aria-label={`Editar evento: ${item.title}`}
-                  title="Editar evento"
+                  aria-label={`${isGoogle ? "Ver evento de Google" : "Editar evento"}: ${item.title}`}
+                  title={isGoogle ? "Ver evento de Google" : "Editar evento"}
                   className="-mt-1 -mr-1.5 grid size-8 shrink-0 place-items-center rounded-md text-graphite outline-none transition-colors hover:text-charcoal focus-visible:bg-paper focus-visible:text-charcoal"
                 >
                   <PencilLine aria-hidden className="size-4" strokeWidth={1.25} />

@@ -195,6 +195,63 @@ export type Database = {
         }
         Relationships: []
       }
+      google_calendar_item_links: {
+        Row: {
+          calendar_event_id: string | null
+          content_hash: string
+          created_at: string
+          google_calendar_id: string
+          google_event_id: string
+          id: string
+          item_type: string
+          last_synced_at: string
+          task_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          calendar_event_id?: string | null
+          content_hash: string
+          created_at?: string
+          google_calendar_id: string
+          google_event_id: string
+          id?: string
+          item_type: string
+          last_synced_at?: string
+          task_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          calendar_event_id?: string | null
+          content_hash?: string
+          created_at?: string
+          google_calendar_id?: string
+          google_event_id?: string
+          id?: string
+          item_type?: string
+          last_synced_at?: string
+          task_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_calendar_item_links_event_owner_fkey"
+            columns: ["calendar_event_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_events"
+            referencedColumns: ["id", "user_id"]
+          },
+          {
+            foreignKeyName: "google_calendar_item_links_task_owner_fkey"
+            columns: ["task_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id", "user_id"]
+          },
+        ]
+      }
       inbox_items: {
         Row: {
           content: string | null
@@ -375,6 +432,13 @@ export type Database = {
         Args: { p_assignments: Json; p_canvas_course_id: string }
         Returns: {
           assignment_id: string
+          outcome: string
+        }[]
+      }
+      sync_google_calendar_events: {
+        Args: { p_calendar_id: string; p_events: Json }
+        Returns: {
+          event_id: string
           outcome: string
         }[]
       }

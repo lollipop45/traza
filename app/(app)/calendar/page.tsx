@@ -94,7 +94,13 @@ export default async function CalendarPage({ searchParams }: PageProps<"/calenda
             editor={
               editing && (
                 <div className="pt-4">
-                  <EventForm key={editing.id} mode={{ kind: "edit", event: editing }} projects={projects} closeHref={closeHref} />
+                  <EventForm
+                    key={editing.id}
+                    mode={{ kind: "edit", event: editing }}
+                    projects={projects}
+                    closeHref={closeHref}
+                    googleConnected={googleStatus.state === "connected"}
+                  />
                 </div>
               )
             }

@@ -20,6 +20,18 @@ export type CalendarEventRecord = Pick<
 export const CALENDAR_EVENT_COLUMNS =
   "id, title, description, event_date, start_time, end_time, all_day, location, project_id, source";
 
+/**
+ * Imported from the user's selected Google calendar (manual Google sync). Google owns its title,
+ * date, times, location and description; TRAZA only lets the user choose its project, and does not
+ * delete it (it is deleted in Google Calendar).
+ */
+export const GOOGLE_EVENT_SOURCE = "google-calendar";
+export const GOOGLE_EVENT_DELETE_MESSAGE = "Los eventos de Google se eliminan en Google Calendar.";
+
+export function isGoogleEvent(event: Pick<CalendarEventRow, "source">): boolean {
+  return event.source === GOOGLE_EVENT_SOURCE;
+}
+
 /** Mirror the check constraints in 20261005162926_create_calendar_events.sql. */
 export const EVENT_TITLE_MAX_LENGTH = 200;
 export const EVENT_LOCATION_MAX_LENGTH = 200;

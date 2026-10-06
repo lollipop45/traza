@@ -157,9 +157,9 @@ La vista previa agrupa: **Revisar** (Importar / Ignorar), **Importadas · revisa
 
 Si la universidad no permite tokens personales (el botón "Nuevo token de acceso" no aparece), la alternativa es OAuth2 con una *developer key* emitida por la administración de Canvas; no está implementado.
 
-## Google Calendar · conexión (sin sincronizar eventos)
+## Google Calendar · conexión
 
-Google es una **integración** de un usuario de TRAZA ya autenticado; no es un método de inicio de sesión (TRAZA sigue usando correo y contraseña de Supabase). En esta fase solo se conecta la cuenta y se elige un calendario: no se importan ni se crean eventos y `public.calendar_events` no cambia.
+Google es una **integración** de un usuario de TRAZA ya autenticado; no es un método de inicio de sesión (TRAZA sigue usando correo y contraseña de Supabase). Esta sección cubre conectar la cuenta y elegir un calendario; la sincronización manual de eventos está en la sección siguiente.
 
 ### Pasos en Google Cloud Console
 
@@ -201,6 +201,66 @@ Reinicia `npm run dev` tras editarlas. **Producción:** cuando TRAZA se desplieg
 - **Diagnóstico (solo en desarrollo):** si la conexión falla, el callback añade `&google_error=<etapa>` (`state_cookie_missing`, `state_cookie_decrypt`, `state_expired`, `state_mismatch`, `user_mismatch`, `oauth_denied`, `oauth_error`, `token_exchange`, `refresh_token_missing`, `scope_validation`, `token_encryption`, `database_store`, `unexpected`; `session_missing` va a `/login`). Es una lista cerrada: nunca incluye códigos, tokens, secretos ni errores de Google o de la base de datos. En producción solo aparece `?google=<código>`.
 - La conexión se guarda con UPDATE y, si no hay fila, INSERT; no con upsert: `ON CONFLICT DO UPDATE` lee los valores nuevos vía `EXCLUDED`, lo que exige permiso SELECT sobre las columnas cifradas, que los clientes no tienen.
 
+## Google Calendar · sincronización manual
+
+Migración `20261006122922_google_calendar_sync.sql`. En `/calendar` → *Google Calendar*, con la cuenta conectada y un calendario elegido: **Vista previa Google** (lee y planifica; no escribe nada) y **Sincronizar Google Calendar** (ejecuta ese mismo plan). Solo a mano: sin cron, sin segundo plano, sin *polling*, sin *webhooks* y nada al abrir la página.
+
+### Propiedad por origen (nunca "gana la última escritura")
+
+| Origen | Quién manda | En el otro lado |
+| --- | --- | --- |
+| **TRAZA**: eventos de `calendar_events` que no vienen de Google (manuales, y cualquier otro origen que no sea `google-calendar`) | TRAZA: título, fecha, horas, todo el día, lugar, descripción, proyecto | Google recibe una **copia**. Si la copia se edita o se borra en Google, la siguiente sincronización la **rehace** desde TRAZA. Para cambiarla o quitarla, se hace en TRAZA. |
+| **Entregas** (`tasks` con `due_date`, manuales y de Campus) | TRAZA: título, fecha, completada, proyecto, origen | Google recibe un evento **de todo el día** (sin hora: las tareas no tienen hora y no se inventa) marcado como *libre*. Nunca se crea una fila en `calendar_events`. Google **nunca** cambia la tarea. |
+| **Google**: eventos independientes del calendario elegido | Google: título, descripción, lugar, fecha, horas | TRAZA guarda un evento real (`source = 'google-calendar'`, `external_id = 'calendar:<id calendario>:event:<id evento>'`) que aparece en Calendario e Inicio con la marca `/ GOOGLE`. Esos campos son **solo lectura** en TRAZA ("Google Calendar · Datos sincronizados"); solo se elige el **proyecto**, que es de TRAZA y Google nunca lo toca. No se convierten en tareas ni se borran desde TRAZA. |
+
+Canvas → TRAZA → Google: la sincronización con Google solo lee las tareas de TRAZA; nunca lee Campus.
+
+### Copias de TRAZA en Google
+
+- Cada copia lleva **propiedades extendidas privadas** (`trazaManaged = 1`, `trazaType = calendar_event | task`, `trazaLocalId`, `trazaVersion = 1`): invisibles en Google Calendar, nunca en el texto visible. Nunca se identifica nada por el título.
+- Texto visible: el título real; la descripción del evento más una línea `TRAZA · <proyecto>`; en las tareas, `Tarea de TRAZA · <proyecto> · Campus · Hecha` (según corresponda). Sin ids, sin UUID, sin ids de Canvas.
+- **Tareas completadas:** la copia se conserva (no se borra historia); la descripción añade `Hecha`. El título no cambia.
+- Horas: un evento con hora se envía como hora local + `timeZone: Atlantic/Canary` (Google aplica el desfase correcto a cada lado del cambio de hora). Un evento sin hora de fin termina cuando empieza (no se inventa una duración). Todo el día: fechas simples, fin exclusivo (día siguiente), sin conversión.
+
+### Importación desde Google
+
+- Se lee el calendario elegido con `singleEvents=true` (las **recurrencias** llegan como ocurrencias sueltas, cada una con su id estable; TRAZA no crea reglas de recurrencia) y `showDeleted=true`. Paginado; si hay más de 25 000 eventos en el periodo, no se planifica nada.
+- Se ignoran las copias de TRAZA (por las propiedades privadas y por los vínculos).
+- Campos: `summary` → título (máx. 200, "Sin título" si está vacío); `location` → lugar; `description` → descripción en **texto plano** (se quitan etiquetas HTML, se decodifican entidades; máx. 2000). Proyecto: ninguno (no se adivina por el título).
+- Horas: un instante de Google (RFC 3339 con desfase, o local + zona) se convierte a la **fecha y hora de pared de Atlantic/Canary**. Un fin en otro día local (evento nocturno) se descarta en vez de colocarlo mal. Un evento de varios días aparece en su primer día. Fechas imposibles o formas desconocidas se omiten y se cuentan.
+- Cambios en Google actualizan **el mismo** evento de TRAZA (misma fila), nunca uno nuevo.
+
+### Periodo
+
+Se sincroniza de **hoy − 30 días** a **hoy + 365 días** (días de Atlantic/Canary), en ambos sentidos. A Google se le pide un día de margen a cada lado y se filtra por fecha local. Fuera del periodo: una copia ya vinculada se sigue actualizando si su elemento cambia (comparando un *hash* del contenido, sin pedírsela a Google); no se importa nada nuevo.
+
+### Duplicados
+
+- Vínculos en `public.google_calendar_item_links`: único por (usuario, calendario, evento de Google), por (usuario, calendario, tarea) y por (usuario, calendario, evento de TRAZA).
+- El id de cada copia en Google lo elige TRAZA y es **determinista** (sha256 de tipo + id + calendario, en hex, válido como base32hex). Crear dos veces la misma copia (dos sincronizaciones a la vez, un corte entre Google y la base de datos) choca en Google (409) en vez de duplicar; la siguiente sincronización **adopta** esa copia.
+- Importados: único por (usuario, `google-calendar`, `external_id`).
+- La base de datos solo registra una copia después de que Google la confirme.
+
+### Borrado (conservador)
+
+- **Evento o tarea de TRAZA borrados** (por cualquier camino: Calendario, Inicio, "Ignorar en TRAZA", cascadas): la clave del vínculo pasa a `NULL` (`ON DELETE SET NULL`) y el vínculo queda como **lápida** duradera. La siguiente sincronización borra la copia de Google y después el vínculo; si Google falla, la lápida se queda para el siguiente intento. La vista previa lo muestra como "se quitaría de Google". Ningún camino de borrado de TRAZA necesita hablar con Google y ninguna copia queda huérfana sin aviso.
+- **Tarea a la que se le quita la fecha:** su copia se borra de Google; la tarea sigue.
+- **Evento de Google que desaparece** (o aparece como borrado): no se borra en TRAZA por una sola lectura; se informa ("ya no aparece allí, se conserva"). Borrarlo en TRAZA no está permitido (Google es el dueño).
+- **Copias marcadas por TRAZA sin elemento conocido** (p. ej. copiadas a mano en Google): se omiten y se cuentan; nunca se importan ni se borran.
+
+### Cambio de calendario y desconexión
+
+- Los vínculos guardan el calendario. Si eliges otro, las nuevas sincronizaciones usan el nuevo; los vínculos y copias del anterior **se conservan sin tocar** (ni se actualizan, ni se borran, ni se comparan con el nuevo) y la sincronización los cuenta. Limitación: no hay asistente para migrar o limpiar el calendario anterior; los eventos importados de ese calendario se quedan en TRAZA y dejan de actualizarse.
+- Desconectar no borra vínculos, eventos ni tareas. Con el acceso retirado, TRAZA funciona igual, no se borra nada y la sección muestra "Acceso retirado" hasta reconectar. Si Google no responde, no se escribe nada (o la sincronización se detiene y se informa como incompleta; lo ya confirmado queda registrado).
+
+### Seguridad y límite de confianza
+
+- `public.google_calendar_item_links`: RLS de dueño, `anon` sin nada. Claves foráneas compuestas `(task_id, user_id)` → `tasks (id, user_id)` y `(calendar_event_id, user_id)` → `calendar_events (id, user_id)` (nuevas claves únicas `tasks_id_user_id_key` y `calendar_events_id_user_id_key`): un vínculo nunca puede apuntar a datos de otro usuario, ni aunque conozca el id (no depende solo de RLS). Un *check* exige exactamente la clave de su tipo y un *trigger* exige el elemento al insertar y rechaza vincular un evento de origen Google. Privilegios por columna: los clientes no escriben `user_id`, `id`, marcas de tiempo ni (tras insertar) el elemento vinculado. No contiene secretos.
+- `sync_google_calendar_events(p_calendar_id, p_events)`: SECURITY DEFINER (porque `authenticated` no puede escribir `calendar_events.source/external_id`, y así sigue), `search_path` vacío, `auth.uid()` obligatorio, **sin** parámetro de usuario, solo ejecutable por `authenticated`. Exige que el calendario sea el **elegido** de una conexión **activa** del propio usuario; construye `external_id` él mismo; solo inserta/actualiza filas `source = 'google-calendar'` del propio usuario; nunca escribe `project_id`, nunca borra, nunca toca tareas ni eventos de otro origen; no importa ids que sean copias del propio usuario. Un elemento mal formado rechaza la llamada entera.
+- **Límite de confianza:** el servidor de Next.js lee Google con el token del usuario y solo envía lo que Google acaba de devolver. La base de datos no puede verificar Google. Un usuario autenticado que llamara directamente a la RPC o escribiera sus vínculos solo podría alterar **sus propios** eventos de origen Google o vínculos: nunca datos de otro usuario, eventos manuales, tareas ni otro `user_id`.
+- Sin *service role*. Los resultados al navegador son recuentos más títulos y fechas del propio usuario: nunca tokens, ids de Google, propiedades privadas, respuestas de Google ni errores de la base de datos. Nada se registra en logs.
+- Vista previa: **cero** escrituras en Google y en Supabase (vínculos, eventos, tareas). Lo único que puede escribirse es la caché cifrada del token de acceso si hay que renovarlo (o "Acceso retirado" si Google lo revocó).
+
 ## Estado de la migración a datos reales
 
 | Entidad | Estado |
@@ -213,7 +273,9 @@ Reinicia `npm run dev` tras editarlas. **Producción:** cuando TRAZA se desplieg
 | Canvas · vinculación de cursos | Completa: `public.canvas_course_links` + `/projects/canvas`; etiqueta CAMPUS en Proyectos. |
 | Canvas · entregas | Completa tras aplicar `20261006070920`: sincronización manual con vista previa en `/projects/canvas`; las entregas son tareas reales (`source = 'canvas'`). Clasificación (importar / revisar / omitir) y decisiones por entrega tras aplicar `20261006082922`. |
 | Canvas · sincronización automática | No implementada (sin cron ni segundo plano). Tampoco anuncios, módulos, archivos, foros ni eventos del calendario de Canvas. |
-| Google Calendar · conexión | Completa tras aplicar `20261006095932`: conectar, elegir calendario propio y desconectar en `/calendar`. |
-| Google Calendar · eventos | No implementado: no se importan ni se crean eventos. |
+| Google OAuth | Completo (`20261006095932`). |
+| Google Calendar · elección de calendario | Completa: un calendario propio por usuario, en `/calendar`. |
+| Google Calendar · sincronización manual | Completa tras aplicar `20261006122922`: vista previa + sincronización a mano en `/calendar` (eventos y entregas de TRAZA → Google; eventos de Google → TRAZA). |
+| Google Calendar · sincronización automática | No implementada (sin cron, segundo plano, *webhooks*/canales de aviso ni sincronización al abrir la página). |
 | Asistente | Solo datos mock (`lib/mock-data.ts`). Sus `projectId` son slugs mock, no proyectos reales. |
 | Autenticación | Implementada (correo + contraseña, un usuario creado a mano). |
