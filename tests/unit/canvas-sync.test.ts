@@ -294,16 +294,22 @@ describe("Canvas assignment fetching", () => {
     assert.equal(calls.length, 0);
   });
 
-  it("returns { ok: false } on Canvas errors, without details or the token", async () => {
-    for (const status of [401, 403, 404, 500]) {
+  it("returns { ok: false } with only a safe category on Canvas errors, never the body or the token", async () => {
+    for (const [status, kind] of [
+      [401, "unauthorized"],
+      [403, "forbidden"],
+      [404, "invalid-response"],
+      [500, "unavailable"],
+    ] as const) {
       const fetch: FetchLike = async () => new Response(`secret body ${FAKE_TOKEN}`, { status });
       const result = await readCourseAssignments({ ok: true, config }, "145580", { fetch, retryDelayMs: 0 });
-      assert.deepEqual(result, { ok: false });
+      assert.deepEqual(result, { ok: false, failure: { kind, status, detail: null } });
+      assert.ok(!JSON.stringify(result).includes(FAKE_TOKEN));
     }
     const offOrigin: FetchLike = async () =>
       new Response("[]", { status: 200, headers: { Link: '<https://evil.example.com/api/v1/x?page=2>; rel="next"' } });
-    assert.deepEqual(await readCourseAssignments({ ok: true, config }, "145580", { fetch: offOrigin }), { ok: false });
-    assert.deepEqual(await readCourseAssignments({ ok: false, problem: "missing" }, "145580"), { ok: false });
+    assert.deepEqual(await readCourseAssignments({ ok: true, config }, "145580", { fetch: offOrigin }), { ok: false, failure: { kind: "invalid-response", status: null, detail: null } });
+    assert.deepEqual(await readCourseAssignments({ ok: false, problem: "missing" }, "145580"), { ok: false, failure: { kind: "not-configured", status: null } });
   });
 });
 

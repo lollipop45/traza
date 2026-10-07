@@ -2,7 +2,8 @@
 
 // Manual Campus sync. Both buttons call Server Actions that verify the session, read Canvas on the
 // server and return counts plus the assignments worth seeing. "Vista previa" writes nothing;
-// "Sincronizar Campus" imports or updates tasks. Nothing runs automatically. Review decisions
+// "Sincronizar Campus" imports or updates tasks right away (the automatic sync, triggered by the
+// private layout, runs the same engine at most every 30 minutes). Review decisions
 // ("Importar" / "Ignorar") are explicit, per assignment, and re-verified against Canvas.
 import { RefreshCw } from "lucide-react";
 import { useState, useTransition, type ReactNode } from "react";

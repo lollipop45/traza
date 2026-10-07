@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { ArrowLeft } from "lucide-react";
 import type { ReactNode } from "react";
+import { CanvasAutoSyncStatus } from "@/components/canvas/CanvasAutoSyncStatus";
 import { CanvasCourseRow } from "@/components/canvas/CanvasCourseRow";
 import { AssignmentPreferenceRow } from "@/components/canvas/AssignmentPreferenceRow";
 import { CanvasSyncPanel } from "@/components/canvas/CanvasSyncPanel";
@@ -9,10 +10,12 @@ import { BlueprintBackdrop } from "@/components/ui/BlueprintBackdrop";
 import { OutlineIconButton } from "@/components/ui/OutlineIconButton";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SectionHeader } from "@/components/ui/SectionHeader";
+import { requireUser } from "@/lib/auth/session";
 import { currentISODate } from "@/lib/calendar/dates";
 import { getCanvasCourseLinks } from "@/lib/canvas/links";
 import { buildCourseMapping, proposedProjectName, type CanvasCourseLink } from "@/lib/canvas/mapping";
 import { getCanvasOverview } from "@/lib/canvas/queries";
+import { getCanvasSyncStatus } from "@/lib/canvas/sync-state-store";
 import { getCanvasAssignmentPreferences } from "@/lib/canvas/sync-store";
 import type { CanvasOverview } from "@/lib/canvas/read";
 import type { CanvasCourse } from "@/lib/canvas/types";
@@ -38,13 +41,16 @@ function unavailableMessage(overview: Exclude<CanvasOverview, { state: "connecte
 }
 
 export default async function CanvasMappingPage() {
+  const user = await requireUser();
   // Live Canvas courses (server-side, server-only token) + stored decisions + real projects.
-  const [overview, linkResult, projectResult, preferences] = await Promise.all([
+  const [overview, linkResult, projectResult, preferences, syncView] = await Promise.all([
     getCanvasOverview(),
     getCanvasCourseLinks(),
     getProjectOptions(),
     // Stored per-assignment decisions; restoring needs no Canvas call, so they show even when Campus is down.
     getCanvasAssignmentPreferences(),
+    // Automatic sync status (no Canvas call).
+    getCanvasSyncStatus(user.id),
   ]);
   const projects = projectResult.ok ? projectResult.projects : [];
   const links = linkResult.ok ? linkResult.links : [];
@@ -67,6 +73,8 @@ export default async function CanvasMappingPage() {
 
 
         <div className="flex flex-col gap-12 lg:col-span-7 lg:col-start-1 lg:row-start-2">
+          <CanvasAutoSyncStatus view={syncView} />
+
           {!linkResult.ok && (
             <p role="alert" className="border-l border-charcoal pl-3 text-[14px] text-charcoal">
               No se han podido cargar tus vínculos con Campus.
@@ -204,6 +212,10 @@ export default async function CanvasMappingPage() {
             y la asistencia se omiten; lo dudoso queda en «Revisar» hasta que decidas. Campus decide el título, la fecha
             y el proyecto; tú, la prioridad y si está hecha. Nada se borra solo: «Ignorar en TRAZA» quita una tarea de
             Campus y evita que vuelva.
+          </p>
+          <p className="mt-3 text-[14px] leading-[1.55] text-graphite">
+            Mientras usas TRAZA, Campus se comprueba solo como mucho cada 30 minutos, con las mismas reglas: lo dudoso
+            nunca se importa sin tu decisión. «Sincronizar Campus» sigue disponible para hacerlo al momento.
           </p>
           {mapping && (
             <p className="mt-4 font-mono text-[10px] uppercase tracking-[0.14em] text-graphite">

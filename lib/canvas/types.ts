@@ -17,16 +17,21 @@ export type CanvasErrorKind =
   /** Unexpected status (e.g. 404), non-JSON body or a shape TRAZA cannot read. */
   | "invalid-response";
 
+/** For a failure without an HTTP status: whether the request timed out or the network failed. */
+export type CanvasFailureDetail = "timeout" | "network";
+
 export class CanvasError extends Error {
   readonly kind: CanvasErrorKind;
   readonly status: number | null;
+  readonly detail: CanvasFailureDetail | null;
 
-  constructor(kind: CanvasErrorKind, status: number | null = null) {
+  constructor(kind: CanvasErrorKind, status: number | null = null, detail: CanvasFailureDetail | null = null) {
     // Fixed message: no URL, body or header can leak through error logging.
     super(`Canvas request failed: ${kind}${status ? ` (${status})` : ""}`);
     this.name = "CanvasError";
     this.kind = kind;
     this.status = status;
+    this.detail = detail;
   }
 }
 

@@ -3,10 +3,14 @@ import { assignmentExternalId, assignmentRelevance, toTaskWrite, type CanvasTask
 import { classifyAssignment, type AssignmentClass } from "./classify";
 import type { CanvasCourseLink } from "./mapping";
 import type { CanvasOverview } from "./read";
+import { canvasFailureCode, type CanvasFailure, type SyncErrorCode } from "./sync-policy";
 import type { CanvasAssignment } from "./types";
 
-// Manual Canvas assignment sync, independent of Next.js and Supabase so it can be tested with a
-// mocked Canvas and store. lib/canvas/sync-actions.ts wires the real dependencies.
+// THE Canvas assignment reconciliation engine, shared by the manual sync ("Vista previa" /
+// "Sincronizar Campus") and the automatic one (lib/canvas/auto-sync.ts wraps it with the per-user
+// lease and cooldown). Independent of Next.js and Supabase so it can be tested with a mocked Canvas
+// and store; lib/canvas/sync-deps.ts wires the real dependencies. There is no second implementation
+// of these rules anywhere.
 //
 // Authenticity: a stored link is never enough. Each run reads the user's current Canvas courses on
 // the server and only syncs links whose course id is in that live response. Links Canvas no longer
@@ -19,13 +23,14 @@ import type { CanvasAssignment } from "./types";
 //   4. classifyAssignment: actionable → imported; ignored-by-rule → omitted and listed;
 //      needs-review → listed under "Revisar", imported only once the user chose "Importar".
 // A task that already exists but would no longer be imported is listed as "imported, review": it
-// is never deleted silently; the user's "Ignorar en TRAZA" removes it.
+// is never deleted silently; the user's "Ignorar en TRAZA" removes it. Likewise, an assignment
+// missing from one Canvas response never deletes its task: absence alone is not evidence.
 
 export type SyncMode = "preview" | "sync";
 
 export type AssignmentsRead =
   | { ok: true; assignments: CanvasAssignment[]; malformed: number; truncated: boolean }
-  | { ok: false };
+  | { ok: false; failure?: CanvasFailure };
 
 export type UpsertOutcome = { assignment_id: string; outcome: string };
 
@@ -129,11 +134,13 @@ export type CanvasSyncSummary = {
   toCreate: number;
   existing: number;
   errors: number;
+  /** Safe code of the first failed course (null when none failed). */
+  errorCode: SyncErrorCode | null;
   courses: CourseSyncReport[];
   items: SyncItem[];
 };
 
-export type CanvasSyncResult = { ok: true; summary: CanvasSyncSummary } | { ok: false; error: string };
+export type CanvasSyncResult = { ok: true; summary: CanvasSyncSummary } | { ok: false; error: string; code: SyncErrorCode };
 
 /** Rows per sync_canvas_course_tasks call (the function accepts up to 500). */
 export const UPSERT_BATCH_SIZE = 200;
@@ -226,18 +233,21 @@ export function planCourse(
 
 export async function runCanvasSync(deps: SyncDeps, mode: SyncMode): Promise<CanvasSyncResult> {
   const overview = await deps.loadOverview();
-  if (overview.state !== "connected") return { ok: false, error: canvasUnavailableMessage(overview) };
+  if (overview.state !== "connected") {
+    const code = overview.state === "not-configured" ? "not_configured" : canvasFailureCode(overview);
+    return { ok: false, error: canvasUnavailableMessage(overview), code };
+  }
 
   const linkResult = await deps.loadLinks();
-  if (!linkResult.ok) return { ok: false, error: "No se han podido cargar tus vínculos con Campus." };
+  if (!linkResult.ok) return { ok: false, error: "No se han podido cargar tus vínculos con Campus.", code: "database" };
 
   // Without the user's decisions an ignored assignment could be recreated: stop before any write.
   const preferenceRows = await deps.loadPreferences();
-  if (!preferenceRows) return { ok: false, error: "No se han podido cargar tus decisiones sobre entregas." };
+  if (!preferenceRows) return { ok: false, error: "No se han podido cargar tus decisiones sobre entregas.", code: "database" };
   const preferences = new Map(preferenceRows.map((row) => [preferenceKey(row.canvas_course_id, row.canvas_assignment_id), row.state]));
 
   const existing = await deps.loadExistingExternalIds();
-  if (!existing) return { ok: false, error: "No se han podido leer tus tareas." };
+  if (!existing) return { ok: false, error: "No se han podido leer tus tareas.", code: "database" };
 
   // Only links the user made (state = linked); ignored courses and unmapped ones (no row) never sync.
   const linked = linkResult.links.filter((link) => link.state === "linked" && link.project_id);
@@ -247,6 +257,7 @@ export async function runCanvasSync(deps: SyncDeps, mode: SyncMode): Promise<Can
   const reports: CourseSyncReport[] = [];
   const items: SyncItem[] = [];
   let errors = 0;
+  let errorCode: SyncErrorCode | null = null;
 
   // Sequential: a handful of courses, and gentle on the Canvas API.
   for (const link of linked) {
@@ -262,6 +273,7 @@ export async function runCanvasSync(deps: SyncDeps, mode: SyncMode): Promise<Can
     const read = await deps.loadAssignments(course.id);
     if (!read.ok) {
       errors += 1;
+      errorCode ??= canvasFailureCode(read.failure);
       reports.push(emptyReport(courseName, projectName, "failed"));
       continue;
     }
@@ -291,6 +303,7 @@ export async function runCanvasSync(deps: SyncDeps, mode: SyncMode): Promise<Can
         if (!outcomes) {
           // Earlier batches are already committed and stay counted; the course is reported as failed.
           errors += 1;
+          errorCode ??= "database";
           report.status = "failed";
           break;
         }
@@ -327,6 +340,7 @@ export async function runCanvasSync(deps: SyncDeps, mode: SyncMode): Promise<Can
       toCreate: sum("toCreate"),
       existing: sum("existing"),
       errors,
+      errorCode,
       courses: reports,
       items,
     },

@@ -286,6 +286,75 @@ export type Database = {
           },
         ]
       }
+      canvas_sync_state: {
+        Row: {
+          consecutive_failures: number
+          created_at: string
+          last_attempt_at: string | null
+          last_courses_count: number
+          last_error_code: string | null
+          last_finished_at: string | null
+          last_ignored_count: number
+          last_imported_count: number
+          last_result: string | null
+          last_review_count: number
+          last_skipped_count: number
+          last_success_at: string | null
+          last_trigger: string | null
+          last_unchanged_count: number
+          last_updated_count: number
+          lease_token: string | null
+          lease_until: string | null
+          next_eligible_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          consecutive_failures?: number
+          created_at?: string
+          last_attempt_at?: string | null
+          last_courses_count?: number
+          last_error_code?: string | null
+          last_finished_at?: string | null
+          last_ignored_count?: number
+          last_imported_count?: number
+          last_result?: string | null
+          last_review_count?: number
+          last_skipped_count?: number
+          last_success_at?: string | null
+          last_trigger?: string | null
+          last_unchanged_count?: number
+          last_updated_count?: number
+          lease_token?: string | null
+          lease_until?: string | null
+          next_eligible_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          consecutive_failures?: number
+          created_at?: string
+          last_attempt_at?: string | null
+          last_courses_count?: number
+          last_error_code?: string | null
+          last_finished_at?: string | null
+          last_ignored_count?: number
+          last_imported_count?: number
+          last_result?: string | null
+          last_review_count?: number
+          last_skipped_count?: number
+          last_success_at?: string | null
+          last_trigger?: string | null
+          last_unchanged_count?: number
+          last_updated_count?: number
+          lease_token?: string | null
+          lease_until?: string | null
+          next_eligible_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       google_calendar_connections: {
         Row: {
           access_token_ciphertext: string | null
@@ -551,6 +620,15 @@ export type Database = {
         Args: { p_key: string; p_payload: Json }
         Returns: string
       }
+      claim_canvas_sync: {
+        Args: { p_lease_seconds: number; p_trigger: string }
+        Returns: {
+          claimed: boolean
+          consecutive_failures: number
+          lease_token: string
+          reason: string
+        }[]
+      }
       create_project_from_canvas_course: {
         Args: {
           p_area?: string
@@ -574,6 +652,22 @@ export type Database = {
           item_type: string
           outcome: string
         }[]
+      }
+      finish_canvas_sync: {
+        Args: {
+          p_courses?: number
+          p_error_code?: string
+          p_ignored?: number
+          p_imported?: number
+          p_lease_token: string
+          p_next_eligible_seconds: number
+          p_result: string
+          p_review?: number
+          p_skipped?: number
+          p_unchanged?: number
+          p_updated?: number
+        }
+        Returns: boolean
       }
       get_google_calendar_credentials: {
         Args: never

@@ -35,6 +35,11 @@ export async function updateSession(request: NextRequest) {
   const isSignedIn = Boolean(data?.claims?.sub);
   const { pathname } = request.nextUrl;
 
+  // A signed-out API write (e.g. the Canvas auto-sync check) gets a plain 401, not a redirect to the
+  // login page that fetch would follow. Handlers verify the session themselves as well.
+  if (!isSignedIn && pathname.startsWith("/api/") && request.method !== "GET") {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401, headers: { "Cache-Control": "no-store" } });
+  }
   if (!isSignedIn && !isPublicPath(pathname)) return redirectKeepingSession(request, response, LOGIN_PATH);
   if (isSignedIn && pathname === LOGIN_PATH) return redirectKeepingSession(request, response, HOME_PATH);
 

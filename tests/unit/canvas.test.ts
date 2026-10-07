@@ -311,10 +311,10 @@ describe("Canvas client against a mock server", () => {
     assert.equal(requests.length, 1);
   });
 
-  it("retries a transient 503 once, then reports unavailable", async () => {
+  it("retries a transient 503 (3 attempts in all), then reports unavailable", async () => {
     handler = (_req, res) => json(res, 503, {});
     assert.deepEqual(await readCanvasOverview(config(), fast), { state: "error", kind: "unavailable", status: 503 });
-    assert.equal(requests.length, 2);
+    assert.equal(requests.length, 3);
 
     requests = [];
     let calls = 0;
@@ -332,13 +332,13 @@ describe("Canvas client against a mock server", () => {
       /* never responds */
     };
     const started = Date.now();
-    assert.deepEqual(await readCanvasOverview(config(), { retryDelayMs: 1, timeoutMs: 150 }), { state: "error", kind: "unavailable", status: null });
+    assert.deepEqual(await readCanvasOverview(config(), { retryDelayMs: 1, timeoutMs: 150 }), { state: "error", kind: "unavailable", status: null, detail: "timeout" });
     assert.ok(Date.now() - started < 2000);
   });
 
   it("reports network failures as unavailable", async () => {
     const closed = { ok: true as const, config: { baseUrl: "http://127.0.0.1:1", token: FAKE_TOKEN } };
-    assert.deepEqual(await readCanvasOverview(closed, fast), { state: "error", kind: "unavailable", status: null });
+    assert.deepEqual(await readCanvasOverview(closed, fast), { state: "error", kind: "unavailable", status: null, detail: "network" });
   });
 
   it("survives HTML, invalid JSON and unexpected shapes", async () => {
