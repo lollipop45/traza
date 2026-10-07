@@ -14,6 +14,142 @@ export type Database = {
   }
   public: {
     Tables: {
+      assistant_actions: {
+        Row: {
+          action_type: string
+          created_at: string
+          executed_at: string | null
+          id: string
+          message_id: string
+          payload: Json
+          position: number
+          result_event_id: string | null
+          result_inbox_item_id: string | null
+          result_task_id: string | null
+          state: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          action_type: string
+          created_at?: string
+          executed_at?: string | null
+          id?: string
+          message_id: string
+          payload: Json
+          position: number
+          result_event_id?: string | null
+          result_inbox_item_id?: string | null
+          result_task_id?: string | null
+          state?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          action_type?: string
+          created_at?: string
+          executed_at?: string | null
+          id?: string
+          message_id?: string
+          payload?: Json
+          position?: number
+          result_event_id?: string | null
+          result_inbox_item_id?: string | null
+          result_task_id?: string | null
+          state?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assistant_actions_message_owner_fkey"
+            columns: ["message_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "assistant_messages"
+            referencedColumns: ["id", "user_id"]
+          },
+          {
+            foreignKeyName: "assistant_actions_result_event_owner_fkey"
+            columns: ["result_event_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_events"
+            referencedColumns: ["id", "user_id"]
+          },
+          {
+            foreignKeyName: "assistant_actions_result_inbox_owner_fkey"
+            columns: ["result_inbox_item_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "inbox_items"
+            referencedColumns: ["id", "user_id"]
+          },
+          {
+            foreignKeyName: "assistant_actions_result_task_owner_fkey"
+            columns: ["result_task_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id", "user_id"]
+          },
+        ]
+      }
+      assistant_conversations: {
+        Row: {
+          created_at: string
+          id: string
+          title: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      assistant_messages: {
+        Row: {
+          content: string
+          conversation_id: string
+          created_at: string
+          id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          role: string
+          user_id?: string
+        }
+        Update: {
+          content?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assistant_messages_conversation_owner_fkey"
+            columns: ["conversation_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "assistant_conversations"
+            referencedColumns: ["id", "user_id"]
+          },
+        ]
+      }
       calendar_events: {
         Row: {
           all_day: boolean
@@ -399,6 +535,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_assistant_reply: {
+        Args: { p_actions?: Json; p_content: string; p_conversation_id: string }
+        Returns: string
+      }
+      assistant_payload_date: {
+        Args: { p_key: string; p_payload: Json }
+        Returns: string
+      }
+      assistant_payload_text: {
+        Args: { p_key: string; p_payload: Json }
+        Returns: string
+      }
+      assistant_payload_time: {
+        Args: { p_key: string; p_payload: Json }
+        Returns: string
+      }
       create_project_from_canvas_course: {
         Args: {
           p_area?: string
@@ -410,6 +562,18 @@ export type Database = {
           p_status?: string
         }
         Returns: string
+      }
+      dismiss_assistant_action: {
+        Args: { p_action_id: string }
+        Returns: string
+      }
+      execute_assistant_action: {
+        Args: { p_action_id: string }
+        Returns: {
+          item_id: string
+          item_type: string
+          outcome: string
+        }[]
       }
       get_google_calendar_credentials: {
         Args: never
