@@ -9,7 +9,7 @@ En `.env.local` (ignorado por Git mediante `.env*`):
 | `NEXT_PUBLIC_SUPABASE_URL` | URL del proyecto |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Clave publicable (`sb_publishable_…`) |
 
-Ambas son públicas por diseño: lo que protege los datos es RLS, no la clave. **Nunca** añadas una clave secreta / `service_role` con prefijo `NEXT_PUBLIC_` ni la importes en código de cliente; esta fase no la necesita.
+Ambas son públicas por diseño: lo que protege los datos es RLS, no la clave. **Nunca** añadas una clave secreta / `service_role` con prefijo `NEXT_PUBLIC_` ni la importes en código de cliente. La única clave secreta (`SUPABASE_SECRET_KEY`, `sb_secret_…`) la usa solo el programador de producción (`lib/supabase/admin.ts`, ver [docs/production.md](production.md)); la app interactiva nunca.
 
 ## Clientes
 
@@ -155,7 +155,7 @@ La vista previa agrupa: **Revisar** (Importar / Ignorar), **Importadas · revisa
 
 ### Sincronización automática (mientras usas TRAZA)
 
-Migración `20261007083209_canvas_sync_state.sql`. Campus se sincroniza solo, sin pulsar "Sincronizar Campus", **mientras la aplicación privada está abierta**. Es oportunista: no hay cron ni trabajo en segundo plano, y nada actúa por un usuario que no está usando TRAZA (no se guardan tokens de Supabase, cookies ni claves de *service role*).
+Migración `20261007083209_canvas_sync_state.sql`. Campus se sincroniza solo, sin pulsar "Sincronizar Campus", mientras la aplicación privada está abierta (no se guardan tokens de Supabase ni cookies para actuar después). Con la app cerrada lo hace el programador de producción con el mismo motor, turno y espera ([docs/production.md](production.md)).
 
 - **Un solo motor:** `lib/canvas/sync.ts` (`runCanvasSync`) es la única implementación de las reglas (cursos vivos, vínculos, decisiones, relevancia, clasificación). `lib/canvas/auto-sync.ts` (`runLeasedCanvasSync`) solo lo envuelve con el turno (*lease*) y el estado; lo usan **tanto** el botón "Sincronizar Campus" (`trigger = manual`) como la comprobación automática (`trigger = automatic`). Las dependencias reales están en `lib/canvas/sync-deps.ts`. "Vista previa" usa el mismo motor, sin turno y sin escribir.
 - **Disparo:** `components/canvas/CanvasAutoSyncTrigger.tsx`, montado en el *layout* privado (`app/(app)/layout.tsx`, nunca en `/login`) solo si Canvas está configurado. Hace `POST /api/integrations/canvas/auto-sync` 3 s después de cargar, cada 15 min mientras la pestaña está visible, y al volver a una pestaña oculta ≥ 10 min; nunca más de una vez cada 5 min por pestaña. No envía cuerpo ni ids. Si se importó o actualizó algo, refresca la página.
@@ -279,7 +279,7 @@ Se sincroniza de **hoy − 30 días** a **hoy + 365 días** (días de Atlantic/C
 
 ## Google Calendar · sincronización automática (mientras usas TRAZA)
 
-Migración `20261007103558_google_calendar_sync_state.sql`. Mismo diseño que la de Campus: oportunista, solo dentro de peticiones del usuario conectado; sin cron, sin segundo plano, sin *service role* y sin guardar sesiones para actuar después.
+Migración `20261007103558_google_calendar_sync_state.sql`. Mismo diseño que la de Campus: dentro de peticiones del usuario conectado y, con la app cerrada, del programador de producción (mismo motor, turno y espera; [docs/production.md](production.md)).
 
 - **Un solo motor:** `runGoogleSync` (`lib/google-calendar/sync.ts`) planifica y ejecuta para "Vista previa Google", "Sincronizar Google Calendar" y la sincronización automática. `lib/google-calendar/auto-sync.ts` (`runLeasedGoogleSync`) solo añade comprobaciones previas, turno y estado. Las reglas de propiedad (TRAZA manda en sus eventos y tareas; Google en los suyos), el periodo (hoy −30 / +365 días, Atlantic/Canary), los vínculos, las lápidas y las propiedades privadas no cambian.
 - **Disparo:** `components/calendar/GoogleCalendarAutoSyncTrigger.tsx` en el *layout* privado (nunca en `/login`), solo si Google está configurado; independiente del de Campus. `POST /api/integrations/google/auto-sync` 5 s después de cargar, cada 10 min con la pestaña visible y al volver a una pestaña oculta ≥ 10 min; como mucho una vez cada 4 min, compartido entre pestañas (`localStorage`, solo una hora). Sin cuerpo ni ids; sin avisos. Si se importaron eventos de Google, refresca la página.
@@ -348,7 +348,7 @@ Migración `20261008083736_notifications.sql`. Ajustes en `/settings` (icono jun
 - **Planificador** (`lib/notifications/planner.ts`, puro): hora de Canarias. Tareas para mañana desde las 20:00; resumen entre 08:00 y 12:00; eventos con hora `n` minutos antes (como mucho 30 min tarde, nunca después de empezar; los de todo el día no). Las tareas no tienen hora: nunca se inventa una.
 - **Sin duplicados:** cada aviso tiene una clave estable (`tomorrow_tasks:2026-10-09`, `morning_summary:2026-10-09`, `event:<id>:60m:<inicio>`); se reserva en la base de datos antes de enviarse. Un fallo temporal se reintenta (máx. 3 intentos, misma fila); enviado u omitido es definitivo.
 - **Envío** (`web-push`, solo servidor): 404/410 → se borra **solo** esa suscripción; 429/5xx → se conserva; 400/401/403/413 → rechazo (configuración). Al navegador solo llegan frases fijas.
-- **Ahora:** mientras TRAZA está abierta, `NotificationCheckTrigger` pide cada 10 min `POST /api/notifications/check` (mismo origen, sesión). **El envío programado con TRAZA cerrada se activará en Prompt 23 (programador de producción)**, reutilizando `lib/notifications/run.ts`.
+- **Cuándo se comprueban:** mientras TRAZA está abierta, `NotificationCheckTrigger` pide cada 10 min `POST /api/notifications/check` (mismo origen, sesión). Con TRAZA cerrada, el programador de producción (Supabase Cron → `POST /api/internal/scheduler`, ver [docs/production.md](production.md)) ejecuta el mismo `lib/notifications/run.ts`; la clave de cada aviso evita que se envíe dos veces.
 - **Prueba:** Ajustes → "Enviar notificación de prueba" (solo a tus dispositivos; no crea nada).
 
 ## Estado de la migración a datos reales
@@ -362,13 +362,13 @@ Migración `20261008083736_notifications.sql`. Ajustes en `/settings` (icono jun
 | Canvas · conexión | Completa: lectura de perfil y cursos activos (`/dev/canvas`). |
 | Canvas · vinculación de cursos | Completa: `public.canvas_course_links` + `/projects/canvas`; etiqueta CAMPUS en Proyectos. |
 | Canvas · entregas | Completa tras aplicar `20261006070920`: sincronización manual con vista previa en `/projects/canvas`; las entregas son tareas reales (`source = 'canvas'`). Clasificación (importar / revisar / omitir) y decisiones por entrega tras aplicar `20261006082922`. |
-| Canvas · sincronización automática | Oportunista tras aplicar `20261007083209`: mientras usas TRAZA, como mucho cada 30 min, con turno por usuario en la base de datos. Sin cron ni ejecución con la aplicación cerrada. Tampoco anuncios, módulos, archivos, foros ni eventos del calendario de Canvas. |
+| Canvas · sincronización automática | Tras aplicar `20261007083209`: mientras usas TRAZA y, en producción, también con la app cerrada (programador, `20261008094339` + `20261008121027`), como mucho cada 30 min, con turno por usuario en la base de datos. El programador solo la ejecuta si **un único** usuario tiene cursos vinculados (el token de Canvas es personal). Sin anuncios, módulos, archivos, foros ni eventos del calendario de Canvas. |
 | Google OAuth | Completo (`20261006095932`). |
 | Google Calendar · elección de calendario | Completa: un calendario propio por usuario, en `/calendar`. |
 | Google Calendar · sincronización manual | Completa tras aplicar `20261006122922`: vista previa + sincronización a mano en `/calendar` (eventos y entregas de TRAZA → Google; eventos de Google → TRAZA). |
-| Google Calendar · sincronización automática | Oportunista tras aplicar `20261007103558`: mientras usas TRAZA, como mucho cada 15 min, con turno por usuario en la base de datos. Sin cron, *webhooks* ni ejecución con la aplicación cerrada. |
+| Google Calendar · sincronización automática | Tras aplicar `20261007103558`: mientras usas TRAZA y, en producción, también con la app cerrada (programador, `20261008094339` + `20261008121027`), como mucho cada 15 min, con turno por usuario en la base de datos. Sin *webhooks*. |
 | Asistente | Real tras aplicar `20261006141207` y configurar `GROQ_API_KEY` (Groq, `openai/gpt-oss-20b`): preguntas con tus datos reales, propuestas (tarea, evento, nota, idea) que solo se crean al confirmarlas (`source = 'ai'`), historial persistente. Sin edición ni borrado por IA. |
 | PWA | Instalable, con service worker conservador y página sin conexión. |
-| Notificaciones | Web Push tras aplicar `20261008083736` y configurar VAPID: activación por dispositivo, preferencias, prueba, avisos mientras TRAZA está abierta. Envío con la app cerrada: Prompt 23. |
-| Sincronización en segundo plano | No implementada (Prompt 23). |
+| Notificaciones | Web Push tras aplicar `20261008083736` y configurar VAPID: activación por dispositivo, preferencias, prueba; avisos con TRAZA abierta y, en producción, también cerrada. |
+| Programador en segundo plano | Tras aplicar `20261008094339` y `20261008121027`, desplegar en Vercel y guardar en Vault la URL y el secreto: Supabase Cron llama cada 5 min a `POST /api/internal/scheduler` (avisos, Campus, Google). Ver [docs/production.md](production.md). |
 | Autenticación | Implementada (correo + contraseña, un usuario creado a mano). |

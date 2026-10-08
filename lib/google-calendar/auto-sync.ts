@@ -16,8 +16,9 @@ import {
 // pre-checks → claim → sync → record + release. Independent of Next.js and Supabase (tested with
 // fakes); lib/google-calendar/sync-deps.ts wires the real store and Google.
 //
-// Opportunistic only: it runs inside a request of the signed-in user. A future trusted scheduler
-// would call the same engine with its own authorization; nothing here acts for an offline user.
+// It always runs as one user, through that user's session: the signed-in user's request, or the
+// trusted scheduler (lib/scheduler/), which opens a session for each due user and calls this with
+// the "automatic" trigger, so the same cooldown and lease apply.
 
 export type GoogleSyncOutcome =
   | "success"

@@ -8,8 +8,8 @@ import type { NotificationPreferences } from "./preferences";
 // events + an instant → a list of reminders, each with a stable dedupe key. All calendar semantics
 // are Atlantic/Canary wall-clock time (never the server's zone): the planner turns "now" into a
 // Canary date and time first. It does not send or store anything; lib/notifications/run.ts claims
-// each reminder by its key (durable dedupe) and delivers it. Invoked today while the app is open,
-// and later (Prompt 23) by the trusted scheduler, unchanged.
+// each reminder by its key (durable dedupe) and delivers it. Invoked while the app is open and by
+// the trusted scheduler while it is closed, unchanged.
 //
 //   tomorrow_tasks   from 20:00 until midnight: pending tasks due tomorrow (by date; tasks have no time).
 //   morning_summary  from 08:00 until 12:00: pending tasks due today, plus overdue ones.

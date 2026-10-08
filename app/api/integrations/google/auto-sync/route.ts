@@ -13,8 +13,8 @@ import { isSameOriginRequest } from "@/lib/security/same-origin";
 // ones stored for that user. The database decides whether a run is due (cooldown) and lets only one
 // run per user at a time (lease); most calls return "not_due" without touching Google.
 //
-// This is NOT a scheduler: it never acts for a user who is not using TRAZA. A future trusted
-// scheduler would reuse the same engine (lib/google-calendar/sync.ts) with its own authorization.
+// This is NOT the scheduler: it never acts for a user who is not using TRAZA. The trusted scheduler
+// (POST /api/internal/scheduler) reuses the same engine with its own authorization.
 
 export const dynamic = "force-dynamic";
 

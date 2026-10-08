@@ -3,8 +3,8 @@
 // While TRAZA is open, asks the server now and then to deliver any reminder that is due (the planner
 // runs on the server, deduplicated in the database). Rendered by the private layout only when Web
 // Push is configured; renders nothing; never requests permission and never shows anything itself.
-// Independent of the Canvas and Google triggers. Delivery with TRAZA closed comes with Prompt 23's
-// trusted scheduler, which reuses the same server code.
+// Independent of the Canvas and Google triggers. With TRAZA closed, the trusted scheduler
+// (/api/internal/scheduler) runs the same server code; the dedupe keeps them from sending twice.
 import { useEffect } from "react";
 import { NOTIFICATION_CHECK_PATH, PUSH_HEADER } from "@/lib/notifications/request";
 

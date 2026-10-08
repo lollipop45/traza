@@ -1,6 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { HOME_PATH, LOGIN_PATH, isPublicPath } from "@/lib/auth/routes";
+import { HOME_PATH, LOGIN_PATH, isPublicPath, isServerToServerPath } from "@/lib/auth/routes";
 import type { Database } from "./database.types";
 import { getSupabaseEnv } from "./env";
 
@@ -10,6 +10,9 @@ import { getSupabaseEnv } from "./env";
  * is the first line of defence, not the only one.
  */
 export async function updateSession(request: NextRequest) {
+  // The scheduler and the health check carry no user session: nothing to refresh or enforce here.
+  if (isServerToServerPath(request.nextUrl.pathname)) return NextResponse.next();
+
   const { url, publishableKey } = getSupabaseEnv();
   let response = NextResponse.next({ request });
 

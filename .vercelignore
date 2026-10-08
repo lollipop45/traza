@@ -1,0 +1,5 @@
+# Never upload local secrets with `vercel deploy`: production values live in Vercel's
+# Environment Variables, not in files.
+.env*
+*.pem
+.vercel

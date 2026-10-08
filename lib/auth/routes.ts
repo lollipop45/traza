@@ -8,6 +8,17 @@ export const HOME_PATH = "/";
  */
 export const PUBLIC_PWA_PATHS = new Set(["/manifest.webmanifest", "/sw.js", "/offline.html"]);
 
+/**
+ * Server-to-server endpoints. The proxy passes them through untouched (no session lookup, no
+ * redirect, no cookie refresh): the scheduler authenticates with its own secret and the health check
+ * returns no data. Exact paths only.
+ */
+export const SERVER_TO_SERVER_PATHS = new Set(["/api/internal/scheduler", "/api/health"]);
+
+export function isServerToServerPath(pathname: string): boolean {
+  return SERVER_TO_SERVER_PATHS.has(pathname);
+}
+
 /** Routes reachable without a session. Everything else is the private TRAZA app. */
 export function isPublicPath(pathname: string): boolean {
   return (

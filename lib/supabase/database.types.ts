@@ -921,6 +921,101 @@ export type Database = {
         }
         Returns: string
       }
+      scheduler_claim_canvas_sync: {
+        Args: { p_lease_seconds: number; p_trigger: string; p_user_id: string }
+        Returns: {
+          claimed: boolean
+          consecutive_failures: number
+          lease_token: string
+          reason: string
+        }[]
+      }
+      scheduler_claim_google_calendar_sync: {
+        Args: { p_lease_seconds: number; p_trigger: string; p_user_id: string }
+        Returns: {
+          claimed: boolean
+          consecutive_failures: number
+          lease_token: string
+          reason: string
+        }[]
+      }
+      scheduler_claim_notification_delivery: {
+        Args: {
+          p_dedupe_key: string
+          p_event_id?: string
+          p_kind: string
+          p_scheduled_for: string
+          p_user_id: string
+        }
+        Returns: string
+      }
+      scheduler_finish_canvas_sync: {
+        Args: {
+          p_courses?: number
+          p_error_code?: string
+          p_ignored?: number
+          p_imported?: number
+          p_lease_token: string
+          p_next_eligible_seconds: number
+          p_result: string
+          p_review?: number
+          p_skipped?: number
+          p_unchanged?: number
+          p_updated?: number
+          p_user_id: string
+        }
+        Returns: boolean
+      }
+      scheduler_finish_google_calendar_sync: {
+        Args: {
+          p_created?: number
+          p_deleted?: number
+          p_failed?: number
+          p_imported?: number
+          p_lease_token: string
+          p_next_eligible_seconds: number
+          p_result: string
+          p_unchanged?: number
+          p_updated?: number
+          p_user_id: string
+        }
+        Returns: boolean
+      }
+      scheduler_finish_notification_delivery: {
+        Args: {
+          p_failure_code?: string
+          p_id: string
+          p_status: string
+          p_user_id: string
+        }
+        Returns: boolean
+      }
+      scheduler_get_google_calendar_credentials: {
+        Args: { p_user_id: string }
+        Returns: {
+          access_token_ciphertext: string
+          access_token_expires_at: string
+          refresh_token_ciphertext: string
+        }[]
+      }
+      scheduler_sync_canvas_course_tasks: {
+        Args: {
+          p_assignments: Json
+          p_canvas_course_id: string
+          p_user_id: string
+        }
+        Returns: {
+          assignment_id: string
+          outcome: string
+        }[]
+      }
+      scheduler_sync_google_calendar_events: {
+        Args: { p_calendar_id: string; p_events: Json; p_user_id: string }
+        Returns: {
+          event_id: string
+          outcome: string
+        }[]
+      }
       set_canvas_assignment_preference: {
         Args: {
           p_canvas_assignment_id: string

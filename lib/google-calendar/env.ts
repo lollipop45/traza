@@ -33,14 +33,19 @@ const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
  * or http only on loopback for local development; no credentials, query or fragment; and the path
  * of TRAZA's callback route. Google itself also requires an exact match with a registered URI.
  */
-export function normalizeRedirectUri(raw: string): string | null {
+// `allowLoopback: false` (a Vercel production deployment) also refuses localhost / 127.0.0.1, so a
+// development value copied into production fails as "invalid-redirect-uri" instead of sending users
+// to a callback that cannot work.
+export function normalizeRedirectUri(raw: string, options: { allowLoopback?: boolean } = {}): string | null {
   let url: URL;
   try {
     url = new URL(raw.trim());
   } catch {
     return null;
   }
-  const secure = url.protocol === "https:" || (url.protocol === "http:" && LOOPBACK_HOSTS.has(url.hostname));
+  const loopback = LOOPBACK_HOSTS.has(url.hostname);
+  if (loopback && options.allowLoopback === false) return null;
+  const secure = url.protocol === "https:" || (url.protocol === "http:" && loopback);
   if (!secure || url.username || url.password || url.search || url.hash) return null;
   if (url.pathname.replace(/\/+$/, "") !== GOOGLE_CALLBACK_PATH) return null;
   return `${url.origin}${GOOGLE_CALLBACK_PATH}`;
@@ -70,7 +75,8 @@ export function readGoogleCalendarConfig(env: Record<string, string | undefined>
   if (!/^[A-Za-z0-9.-]{10,200}\.apps\.googleusercontent\.com$/.test(clientId) || !/^[\x21-\x7e]{10,256}$/.test(clientSecret)) {
     return { ok: false, problem: "invalid-client" };
   }
-  const redirectUri = normalizeRedirectUri(rawRedirect);
+  // VERCEL_ENV is set by Vercel itself; local `next dev` / `next start` keep the localhost callback.
+  const redirectUri = normalizeRedirectUri(rawRedirect, { allowLoopback: env.VERCEL_ENV !== "production" });
   if (!redirectUri) return { ok: false, problem: "invalid-redirect-uri" };
 
   const current = parseEncryptionKey(rawKey);

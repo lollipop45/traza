@@ -9,8 +9,8 @@ import { isSameOriginRequest } from "@/lib/security/same-origin";
 // runs the planner and delivers any reminder that is due and not yet sent (durable dedupe in the
 // database). POST only, same-origin only, session required; the body is never read.
 //
-// Scheduled delivery while TRAZA is closed will be enabled in Prompt 23 (trusted production
-// scheduler), reusing lib/notifications/run.ts unchanged.
+// While TRAZA is closed, the trusted scheduler (POST /api/internal/scheduler) runs the same
+// lib/notifications/run.ts for the user.
 
 export const dynamic = "force-dynamic";
 

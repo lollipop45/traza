@@ -4,9 +4,9 @@ import type { NotificationPreferences } from "./preferences";
 
 // One planner run for ONE user: plan → claim each reminder by its dedupe key (durable, in the
 // database) → deliver → record the outcome. Independent of Next.js and Supabase (tested with fakes).
-// Today it runs inside the signed-in user's own request while TRAZA is open; Prompt 23's trusted
-// scheduler will call it for each user with its own (server-side) deps. Repeating a run is harmless:
-// a reminder already claimed, sent or skipped is never claimed again.
+// It runs inside the signed-in user's own request while TRAZA is open, and inside a session the
+// trusted scheduler (lib/scheduler/) opens for that user while TRAZA is closed — the same deps both
+// ways. Repeating a run is harmless: a reminder already claimed, sent or skipped is never claimed again.
 
 export type DeliveryStatus = "sent" | "skipped" | "failed";
 

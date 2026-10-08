@@ -59,8 +59,7 @@ export default async function SettingsPage() {
             pantalla de bloqueo, solo recuentos. Las horas son de Canarias.
           </p>
           <p className="mt-3 text-[14px] leading-[1.55] text-graphite">
-            De momento, los avisos se comprueban mientras TRAZA está abierta. El envío programado con TRAZA cerrada llegará
-            con la puesta en producción.
+            Los avisos se comprueban cada pocos minutos, también con TRAZA cerrada, y cada uno llega una sola vez.
           </p>
           <p className="mt-3 text-[14px] leading-[1.55] text-graphite">
             Sin conexión, TRAZA no muestra datos guardados: tus tareas y eventos solo se cargan desde el servidor.
