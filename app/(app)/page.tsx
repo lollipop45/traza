@@ -1,5 +1,6 @@
 import { AppShell } from "@/components/layout/AppShell";
 import { QuickCapture } from "@/components/home/QuickCapture";
+import { InstallHint } from "@/components/pwa/InstallHint";
 import { TaskList } from "@/components/home/TaskList";
 import { TodayOverview } from "@/components/home/TodayOverview";
 import { UpcomingEvents } from "@/components/home/UpcomingEvents";
@@ -40,6 +41,8 @@ export default async function Home() {
         <div className="flex flex-col gap-6 lg:col-span-7 lg:gap-8">
           <PageHeader title="Buenos días" subtitle={formatLongDate(today)} date={today} />
           <QuickCapture today={today} projects={projects.filter(isAssignable)} />
+          {/* Renders nothing unless this browser can install TRAZA and the hint was not dismissed. */}
+          <InstallHint />
         </div>
 
         <div className="lg:col-span-5 lg:self-end">

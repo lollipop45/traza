@@ -29,3 +29,41 @@ body {
 ::selection {
   background-color: rgb(143 167 163 / 0.35);
 }
+
+/* Mobile / installed-app details. These rules are deliberately outside Tailwind's layers, so they
+   win over utility classes without !important. Pinch zoom is never disabled. */
+
+html {
+  /* No automatic text inflation when an iPhone turns to landscape. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Touch screens: form fields at 16 px, so iOS Safari does not zoom the page when one is focused
+   (desktop keeps the designed sizes). */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
+
+/* While typing on a phone or tablet, the fixed bottom navigation steps aside so it never covers the
+   focused field, the assistant composer or the keyboard's toolbar. */
+@media (max-width: 1023.98px) {
+  body:has(:is(input:not([type="checkbox"]):not([type="radio"]), textarea, select):focus) .app-navigation {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

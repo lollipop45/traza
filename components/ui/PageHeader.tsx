@@ -1,3 +1,5 @@
+import { Settings2 } from "lucide-react";
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { Wordmark } from "@/components/ui/Wordmark";
@@ -23,7 +25,17 @@ export function PageHeader({ title, subtitle, date, action }: PageHeaderProps) {
             SEM {isoWeekNumber(date)} · {formatCompactDate(date)}
           </span>
           <span aria-hidden className="h-3.5 w-px bg-charcoal/15" />
-          <SignOutButton />
+          <div className="flex items-center gap-1">
+            <Link
+              href="/settings"
+              title="Ajustes"
+              className="-my-2 inline-flex h-8 items-center gap-2 rounded-md px-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-graphite outline-none transition-colors hover:text-charcoal focus-visible:bg-paper focus-visible:text-charcoal"
+            >
+              <Settings2 aria-hidden className="size-4" strokeWidth={1.25} />
+              <span className="sr-only lg:not-sr-only">Ajustes</span>
+            </Link>
+            <SignOutButton />
+          </div>
         </div>
       </div>
 

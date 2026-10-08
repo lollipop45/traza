@@ -567,6 +567,95 @@ export type Database = {
           },
         ]
       }
+      notification_deliveries: {
+        Row: {
+          attempts: number
+          created_at: string
+          dedupe_key: string
+          event_id: string | null
+          failure_code: string | null
+          id: string
+          kind: string
+          scheduled_for: string
+          sent_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          dedupe_key: string
+          event_id?: string | null
+          failure_code?: string | null
+          id?: string
+          kind: string
+          scheduled_for: string
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          dedupe_key?: string
+          event_id?: string | null
+          failure_code?: string | null
+          id?: string
+          kind?: string
+          scheduled_for?: string
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_deliveries_event_owner_fkey"
+            columns: ["event_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_events"
+            referencedColumns: ["id", "user_id"]
+          },
+        ]
+      }
+      notification_preferences: {
+        Row: {
+          created_at: string
+          event_lead_minutes: number
+          event_reminders: boolean
+          morning_summary: boolean
+          push_enabled: boolean
+          show_details: boolean
+          tomorrow_tasks: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_lead_minutes?: number
+          event_reminders?: boolean
+          morning_summary?: boolean
+          push_enabled?: boolean
+          show_details?: boolean
+          tomorrow_tasks?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          event_lead_minutes?: number
+          event_reminders?: boolean
+          morning_summary?: boolean
+          push_enabled?: boolean
+          show_details?: boolean
+          tomorrow_tasks?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       projects: {
         Row: {
           area: string | null
@@ -601,6 +690,42 @@ export type Database = {
           progress?: number
           source?: string
           status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          endpoint: string
+          expiration_time: string | null
+          id: string
+          last_seen_at: string
+          p256dh: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
+          expiration_time?: string | null
+          id?: string
+          last_seen_at?: string
+          p256dh: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          endpoint?: string
+          expiration_time?: string | null
+          id?: string
+          last_seen_at?: string
+          p256dh?: string
           updated_at?: string
           user_id?: string
         }
@@ -701,6 +826,15 @@ export type Database = {
           reason: string
         }[]
       }
+      claim_notification_delivery: {
+        Args: {
+          p_dedupe_key: string
+          p_event_id?: string
+          p_kind: string
+          p_scheduled_for: string
+        }
+        Returns: string
+      }
       create_project_from_canvas_course: {
         Args: {
           p_area?: string
@@ -755,6 +889,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      finish_notification_delivery: {
+        Args: { p_failure_code?: string; p_id: string; p_status: string }
+        Returns: boolean
+      }
       get_google_calendar_credentials: {
         Args: never
         Returns: {
@@ -762,6 +900,26 @@ export type Database = {
           access_token_expires_at: string
           refresh_token_ciphertext: string
         }[]
+      }
+      save_notification_preferences: {
+        Args: {
+          p_event_lead_minutes: number
+          p_event_reminders: boolean
+          p_morning_summary: boolean
+          p_push_enabled: boolean
+          p_show_details: boolean
+          p_tomorrow_tasks: boolean
+        }
+        Returns: undefined
+      }
+      save_push_subscription: {
+        Args: {
+          p_auth: string
+          p_endpoint: string
+          p_expiration_time?: string
+          p_p256dh: string
+        }
+        Returns: string
       }
       set_canvas_assignment_preference: {
         Args: {

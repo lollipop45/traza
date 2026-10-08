@@ -326,6 +326,31 @@ La clave nunca sale del servidor: va en la cabecera `Authorization: Bearer …`,
 - **Reintentos (solo fallos transitorios):** 408, 429, 500, 502, 503, 504, errores de red y tiempo agotado se reintentan hasta **4 intentos** en total, esperando ~1 s, ~2 s y ~4 s (±25 % de variación aleatoria). Cada intento tiene 20 s como máximo y la llamada completa (intentos + esperas) 60 s: un reintento que no cabría con al menos 5 s no se hace. Nunca se reintentan 400/401/403, una respuesta 200 mal formada, bloqueada o cortada, ni lo que rechaza la validación del asistente. Los reintentos ocurren dentro del adaptador del proveedor (`lib/ai/retry.ts`): el mensaje del usuario y las propuestas se guardan una sola vez. Si un reintento funciona, no se muestra ningún error; si se agotan, se muestra la frase fija de siempre.
 - **Diagnóstico (solo en desarrollo):** cada envío escribe en la consola del servidor una línea `TRAZA assistant diagnostic: provider=groq stage=… status=… attempts=… elapsed=…ms finish=… candidates=… tokens=prompt:…,thoughts:…,output:… model=…` (`candidates` = número de *choices*); si falla, el mensaje de error añade `(Diagnóstico: <etapa>)`. Etapas: `request_failed`, `timeout`, `http_408`, `http_400`, `http_401`, `http_403`, `http_429`, `provider_5xx`, `empty_choices`, `empty_candidates`, `safety_block`, `max_tokens`, `empty_text`, `unexpected_response`, `invalid_json`, `schema_validation`; y, si la respuesta es válida pero se descartan propuestas, `unsupported_action` / `malformed_action`. Solo vocabulario fijo, enumerados y números: nunca la clave, cabeceras, el *prompt*, tus datos, el texto del modelo ni el cuerpo de la respuesta. En producción no se registra nada y solo se ve la frase fija.
 
+## PWA y notificaciones
+
+Migración `20261008083736_notifications.sql`. Ajustes en `/settings` (icono junto a "Cerrar sesión").
+
+### Aplicación instalable
+
+- **Manifiesto:** `app/manifest.ts` (`/manifest.webmanifest`): TRAZA, `standalone`, `start_url` `/`, fondo y tema `#F4F2ED`, `es`, sin bloqueo de orientación. Iconos locales en `public/icons` (192/512 normales y *maskable*, `apple-touch-icon` 180, insignia 96) y `app/favicon.ico`, generados desde la marca con `node scripts/generate-icons.mjs` (sin dependencias).
+- **Metadatos:** `appleWebApp` (título TRAZA, barra de estado `default`), `viewport-fit=cover`, zoom permitido.
+- **Service worker** (`public/sw.js`, registrado por `components/pwa/PwaRegistrar.tsx`): **no guarda datos privados**. Precarga solo `/offline.html` y los iconos en una caché versionada (`traza-static-v1`); al activarse borra cualquier caché anterior. Las navegaciones van siempre a la red; solo si la red falla se muestra la página genérica "Sin conexión". Nunca se guardan páginas, API, Server Actions, Supabase, Canvas, Google, mensajes del asistente ni sesiones. Se sirve con `Cache-Control: no-store` y CSP `'self'`. Para actualizarlo, sube `VERSION`.
+- **Rutas públicas:** `/manifest.webmanifest`, `/sw.js` y `/offline.html` no necesitan sesión (no contienen datos).
+- **Instalar:** en Chrome/Edge, "Instalar" en Inicio (una línea discreta) y en Ajustes (usa `beforeinstallprompt`); en iPhone, Compartir → Añadir a pantalla de inicio. "Ahora no" la oculta 30 días en ese dispositivo; instalada, no aparece nada.
+- **Móvil:** márgenes con `env(safe-area-inset-*)` en los cuatro lados; la barra inferior respeta el indicador de inicio y se oculta mientras se escribe en el móvil; campos a 16 px en pantallas táctiles (iOS no hace zoom al enfocarlos); botones de 44 px en táctil.
+
+### Notificaciones (Web Push)
+
+- **Variables (solo servidor, nunca `NEXT_PUBLIC_`):** `WEB_PUSH_VAPID_PUBLIC_KEY`, `WEB_PUSH_VAPID_PRIVATE_KEY`, `WEB_PUSH_SUBJECT` (`mailto:…`: contacto VAPID para los servicios de push, no contenido de las notificaciones). Generar: `npx web-push generate-vapid-keys --json`. La clave pública llega al navegador por las props de Ajustes; la privada nunca sale del servidor.
+- **Permiso:** solo al pulsar "Activar notificaciones". En iPhone solo funciona con TRAZA instalada (iOS 16.4+); en Safari normal se indica instalarla primero.
+- **Tablas:** `push_subscriptions` (una por dispositivo; única por usuario y *endpoint*; se escribe con `save_push_subscription`, se borra la propia), `notification_preferences` (una fila por usuario, `save_notification_preferences`), `notification_deliveries` (única por usuario y clave; `claim_notification_delivery` / `finish_notification_delivery`). RLS de dueño, `anon` sin nada, funciones fijadas a `auth.uid()`, sin *service role*.
+- **Preferencias por defecto:** notificaciones activas; "Tareas para mañana" (20:00) sí; "Resumen de la mañana" (08:00) no; "Antes de eventos con hora" sí, 60 min; **sin títulos** en la pantalla de bloqueo ("Tienes 2 tareas para mañana."). Nunca notas, descripciones, contenido de Campus, conversaciones, OAuth ni correos.
+- **Planificador** (`lib/notifications/planner.ts`, puro): hora de Canarias. Tareas para mañana desde las 20:00; resumen entre 08:00 y 12:00; eventos con hora `n` minutos antes (como mucho 30 min tarde, nunca después de empezar; los de todo el día no). Las tareas no tienen hora: nunca se inventa una.
+- **Sin duplicados:** cada aviso tiene una clave estable (`tomorrow_tasks:2026-10-09`, `morning_summary:2026-10-09`, `event:<id>:60m:<inicio>`); se reserva en la base de datos antes de enviarse. Un fallo temporal se reintenta (máx. 3 intentos, misma fila); enviado u omitido es definitivo.
+- **Envío** (`web-push`, solo servidor): 404/410 → se borra **solo** esa suscripción; 429/5xx → se conserva; 400/401/403/413 → rechazo (configuración). Al navegador solo llegan frases fijas.
+- **Ahora:** mientras TRAZA está abierta, `NotificationCheckTrigger` pide cada 10 min `POST /api/notifications/check` (mismo origen, sesión). **El envío programado con TRAZA cerrada se activará en Prompt 23 (programador de producción)**, reutilizando `lib/notifications/run.ts`.
+- **Prueba:** Ajustes → "Enviar notificación de prueba" (solo a tus dispositivos; no crea nada).
+
 ## Estado de la migración a datos reales
 
 | Entidad | Estado |
@@ -343,5 +368,7 @@ La clave nunca sale del servidor: va en la cabecera `Authorization: Bearer …`,
 | Google Calendar · sincronización manual | Completa tras aplicar `20261006122922`: vista previa + sincronización a mano en `/calendar` (eventos y entregas de TRAZA → Google; eventos de Google → TRAZA). |
 | Google Calendar · sincronización automática | Oportunista tras aplicar `20261007103558`: mientras usas TRAZA, como mucho cada 15 min, con turno por usuario en la base de datos. Sin cron, *webhooks* ni ejecución con la aplicación cerrada. |
 | Asistente | Real tras aplicar `20261006141207` y configurar `GROQ_API_KEY` (Groq, `openai/gpt-oss-20b`): preguntas con tus datos reales, propuestas (tarea, evento, nota, idea) que solo se crean al confirmarlas (`source = 'ai'`), historial persistente. Sin edición ni borrado por IA. |
-| Notificaciones, PWA, sincronización en segundo plano | No implementadas. |
+| PWA | Instalable, con service worker conservador y página sin conexión. |
+| Notificaciones | Web Push tras aplicar `20261008083736` y configurar VAPID: activación por dispositivo, preferencias, prueba, avisos mientras TRAZA está abierta. Envío con la app cerrada: Prompt 23. |
+| Sincronización en segundo plano | No implementada (Prompt 23). |
 | Autenticación | Implementada (correo + contraseña, un usuario creado a mano). |

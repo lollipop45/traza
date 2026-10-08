@@ -9,7 +9,8 @@ const variants = {
 };
 
 const sizes = {
-  compact: "h-9 px-3",
+  /** 36 px with a mouse; 44 px on touch screens (minimum comfortable tap target). */
+  compact: "h-9 px-3 pointer-coarse:h-11",
   /** Full-width, touch-sized: the main action of a form. */
   block: "h-12 w-full justify-center px-4",
 };

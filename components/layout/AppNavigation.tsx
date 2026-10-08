@@ -29,7 +29,7 @@ export function AppNavigation({ activeHref }: { activeHref: string }) {
   return (
     <nav
       aria-label="Principal"
-      className="fixed inset-x-0 bottom-0 z-20 border-t border-charcoal/10 bg-paper pb-[env(safe-area-inset-bottom)] lg:inset-y-0 lg:right-auto lg:w-22 lg:border-t-0 lg:border-r lg:pb-0"
+      className="app-navigation fixed inset-x-0 bottom-0 z-20 border-t border-charcoal/10 bg-paper pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] lg:inset-y-0 lg:right-auto lg:w-22 lg:border-t-0 lg:border-r lg:px-0 lg:pb-0"
     >
       <ul className="mx-auto grid h-16 max-w-[480px] grid-cols-5 md:max-w-[560px] lg:h-full lg:max-w-none lg:grid-cols-1 lg:content-center lg:gap-2">
         {navItems.map(({ label, icon: Icon, href }) => {
