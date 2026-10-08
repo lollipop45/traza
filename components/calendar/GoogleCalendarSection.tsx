@@ -15,10 +15,13 @@ import {
   startGoogleCalendarConnection,
   type CalendarListState,
 } from "@/lib/google-calendar/actions";
+import type { GoogleSyncStatusView } from "@/lib/google-calendar/sync-status";
 import type { GoogleConnectionStatus } from "@/lib/google-calendar/types";
 
 type GoogleCalendarSectionProps = {
   status: GoogleConnectionStatus;
+  /** Automatic sync status (states and times only). */
+  sync: GoogleSyncStatusView;
   /** Result of the OAuth callback (?google=…), already mapped to Spanish on the server. */
   notice: { text: string; success: boolean } | null;
 };
@@ -33,7 +36,7 @@ const STATE_LABELS: Record<GoogleConnectionStatus["state"], string> = {
 
 const labelClass = "font-mono text-[10px] uppercase tracking-[0.14em] text-graphite";
 
-export function GoogleCalendarSection({ status, notice }: GoogleCalendarSectionProps) {
+export function GoogleCalendarSection({ status, sync, notice }: GoogleCalendarSectionProps) {
   const [pending, startTransition] = useTransition();
   const [calendars, setCalendars] = useState<CalendarListState | null>(null);
   const [choice, setChoice] = useState<string>("");
@@ -41,6 +44,9 @@ export function GoogleCalendarSection({ status, notice }: GoogleCalendarSectionP
   const [error, setError] = useState<string | null>(null);
 
   const linked = status.state === "connected" || status.state === "revoked";
+  // The last automatic run found the access unusable: offer to reconnect even if the row says connected.
+  const reconnect = status.state === "revoked" || (status.state === "connected" && sync.reconnect);
+  const automatic = status.state === "connected" && Boolean(status.calendarName) && !sync.reconnect;
 
   function openChooser() {
     setError(null);
@@ -82,6 +88,15 @@ export function GoogleCalendarSection({ status, notice }: GoogleCalendarSectionP
           </p>
         )}
 
+        <dl aria-label="Sincronización automática" className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[14px]">
+          <dt className={`${labelClass} leading-[21px]`}>Última sincronización</dt>
+          <dd>{sync.lastSync}</dd>
+          <dt className={`${labelClass} leading-[21px]`}>Estado</dt>
+          <dd className="font-mono text-[11px] uppercase leading-[21px] tracking-[0.14em]">{sync.status}</dd>
+          <dt className={`${labelClass} leading-[21px]`}>Próxima comprobación</dt>
+          <dd>{automatic ? "Automática" : "En pausa"}</dd>
+        </dl>
+
         {status.state === "not-configured" && (
           <p className="text-[14px] leading-[1.55] text-graphite">Faltan las credenciales de Google en el servidor (docs/supabase.md · Google Calendar).</p>
         )}
@@ -89,7 +104,7 @@ export function GoogleCalendarSection({ status, notice }: GoogleCalendarSectionP
 
         {status.state === "disconnected" && (
           <p className="max-w-[46ch] text-[14px] leading-[1.55] text-graphite">
-            Conecta tu cuenta de Google y elige uno de tus calendarios para sincronizarlo con TRAZA a mano.
+            Conecta tu cuenta de Google y elige uno de tus calendarios: TRAZA lo sincronizará solo mientras la usas.
           </p>
         )}
 
@@ -177,12 +192,12 @@ export function GoogleCalendarSection({ status, notice }: GoogleCalendarSectionP
           </div>
         ) : (
           <div className="flex flex-wrap gap-2">
-            {(status.state === "disconnected" || status.state === "revoked") && (
+            {(status.state === "disconnected" || reconnect) && (
               // A real form post: Server Actions reject cross-origin requests, and the redirect to
               // Google happens on the server.
               <form action={startGoogleCalendarConnection}>
                 <Button variant={status.state === "disconnected" ? "primary" : "secondary"} type="submit" disabled={pending} icon={Link2}>
-                  {status.state === "revoked" ? "Volver a conectar" : "Conectar Google Calendar"}
+                  {reconnect ? "Volver a conectar" : "Conectar Google Calendar"}
                 </Button>
               </form>
             )}

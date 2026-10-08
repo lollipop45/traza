@@ -46,7 +46,8 @@ export function accountEmailFrom(calendars: GoogleCalendar[]): string | null {
 
 function classify(status: number): GoogleErrorKind {
   if (status === 401 || status === 403) return "unauthorized";
-  if (status === 429 || status >= 500) return "unavailable";
+  if (status === 429) return "rate-limited";
+  if (status === 408 || status >= 500) return "unavailable";
   return "invalid-response";
 }
 

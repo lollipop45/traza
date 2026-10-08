@@ -5,8 +5,11 @@ import { deleteEvent, insertEvent, listEvents, updateEvent, type GoogleEventBody
 import { mirrorEventId, planSync, type ImportedEventWrite, type ItemLink, type LocalEvent, type LocalTask, type MirrorType, type PlanAction } from "./sync-model";
 import { listingRange, syncWindow, type SyncWindow } from "./time";
 
-// Manual Google Calendar sync: load → plan (sync-model.ts) → preview or execute. Independent of
-// Next.js and Supabase (mocked in tests); lib/google-calendar/sync-actions.ts wires the real ones.
+// THE Google Calendar reconciliation engine: load → plan (sync-model.ts) → preview or execute.
+// Shared by "Vista previa Google", "Sincronizar Google Calendar" and the automatic sync
+// (lib/google-calendar/auto-sync.ts wraps it with the per-user lease and cooldown); there is no
+// second implementation of these rules. Independent of Next.js and Supabase (mocked in tests);
+// lib/google-calendar/sync-deps.ts wires the real ones.
 //
 // Preview performs NO writes: no Google write request and no Supabase write (links, events, tasks).
 // The only possible database write during a preview is the existing encrypted access-token cache
@@ -73,10 +76,25 @@ export type GoogleSyncSummary = {
   failed: number;
   /** Sync only: stopped early because Google became unavailable or the access was lost. */
   incomplete: boolean;
+  /** Sync only: why it stopped early, as a safe code (null when it did not). */
+  stopReason: GoogleStopReason | null;
   details: SyncDetail[];
 };
 
-export type GoogleSyncResult = { ok: true; summary: GoogleSyncSummary } | { ok: false; error: string };
+/** Safe failure codes (the automatic sync records them; never a message or a Google body). */
+export type GoogleSyncFailureCode = "not_connected" | "no_calendar" | "reconnect_required" | "rate_limited" | "temporary_error" | "unexpected";
+
+export type GoogleSyncResult = { ok: true; summary: GoogleSyncSummary } | { ok: false; error: string; code: GoogleSyncFailureCode };
+
+/** The safe code of an access failure. */
+export function accessFailureCode(kind: AccessFailure): GoogleSyncFailureCode {
+  if (kind === "not-connected") return "not_connected";
+  if (kind === "revoked" || kind === "unauthorized" || kind === "unreadable") return "reconnect_required";
+  return "temporary_error";
+}
+
+/** Why a sync stopped writing early. */
+export type GoogleStopReason = "temporary_error" | "rate_limited" | "reconnect_required";
 
 const MAX_DETAILS_PER_GROUP = 40;
 const IMPORT_CHUNK = 500;
@@ -106,6 +124,7 @@ function emptySummary(mode: SyncMode, calendarName: string, window: SyncWindow, 
     otherCalendarLinks,
     failed: 0,
     incomplete: false,
+    stopReason: null,
     details: [],
   };
 }
@@ -154,15 +173,16 @@ function tally(summary: GoogleSyncSummary, action: PlanAction) {
  * the same planner; only "sync" then carries the plan out.
  */
 export async function runGoogleSync(deps: GoogleSyncDeps, mode: SyncMode): Promise<GoogleSyncResult> {
+  const fail = (kind: AccessFailure): GoogleSyncResult => ({ ok: false, error: readFailure(kind), code: accessFailureCode(kind) });
   const metadata = await deps.connection.store.loadMetadata();
-  if (!metadata.ok) return { ok: false, error: readFailure("storage") };
-  if (!metadata.metadata) return { ok: false, error: readFailure("not-connected") };
-  if (metadata.metadata.status !== "connected") return { ok: false, error: readFailure("revoked") };
+  if (!metadata.ok) return fail("storage");
+  if (!metadata.metadata) return fail("not-connected");
+  if (metadata.metadata.status !== "connected") return fail("revoked");
   const { selectedCalendarId: calendarId, selectedCalendarName: calendarName } = metadata.metadata;
-  if (!calendarId || !calendarName) return { ok: false, error: FAILURE.calendar };
+  if (!calendarId || !calendarName) return { ok: false, error: FAILURE.calendar, code: "no_calendar" };
 
   const access = await getAccessToken(deps.connection);
-  if (!access.ok) return { ok: false, error: readFailure(access.kind) };
+  if (!access.ok) return fail(access.kind);
   let accessToken = access.accessToken;
   let refreshed = false;
 
@@ -172,18 +192,20 @@ export async function runGoogleSync(deps: GoogleSyncDeps, mode: SyncMode): Promi
   if (!listed.ok && listed.kind === "unauthorized") {
     refreshed = true;
     const retry = await getAccessToken(deps.connection, { forceRefresh: true });
-    if (!retry.ok) return { ok: false, error: readFailure(retry.kind) };
+    if (!retry.ok) return fail(retry.kind);
     accessToken = retry.accessToken;
     listed = await listEvents(accessToken, calendarId, range, deps.connection.fetch);
   }
   if (!listed.ok) {
-    if (listed.kind === "too-many") return { ok: false, error: FAILURE.tooMany };
-    return { ok: false, error: readFailure(listed.kind === "unauthorized" ? "unauthorized" : "unavailable") };
+    if (listed.kind === "too-many") return { ok: false, error: FAILURE.tooMany, code: "unexpected" };
+    if (listed.kind === "rate-limited") return { ok: false, error: readFailure("unavailable"), code: "rate_limited" };
+    if (listed.kind === "invalid-response") return { ok: false, error: readFailure("unavailable"), code: "unexpected" };
+    return fail(listed.kind === "unauthorized" || listed.kind === "revoked" ? "unauthorized" : "unavailable");
   }
 
   const { store } = deps;
   const links = await store.loadLinks();
-  if (!links) return { ok: false, error: FAILURE.local };
+  if (!links) return { ok: false, error: FAILURE.local, code: "temporary_error" };
   const linkedTasks = links.flatMap((link) => (link.task_id ? [link.task_id] : []));
   const linkedEvents = links.flatMap((link) => (link.calendar_event_id ? [link.calendar_event_id] : []));
   const [events, tasks, imported, projectNames] = await Promise.all([
@@ -192,7 +214,7 @@ export async function runGoogleSync(deps: GoogleSyncDeps, mode: SyncMode): Promi
     store.loadImported(),
     store.loadProjectNames(),
   ]);
-  if (!events || !tasks || !imported || !projectNames) return { ok: false, error: FAILURE.local };
+  if (!events || !tasks || !imported || !projectNames) return { ok: false, error: FAILURE.local, code: "temporary_error" };
 
   const plan = planSync({ calendarId, window, events, tasks, imported, links, projectNames, google: listed.events });
   const summary = emptySummary(mode, calendarName, window, plan.otherCalendarLinks);
@@ -217,13 +239,17 @@ export async function runGoogleSync(deps: GoogleSyncDeps, mode: SyncMode): Promi
       const retry = await getAccessToken(deps.connection, { forceRefresh: true });
       if (!retry.ok) {
         stopped = true;
+        summary.stopReason ??= accessFailureCode(retry.kind) === "reconnect_required" ? "reconnect_required" : "temporary_error";
         return { ok: false, kind: "unauthorized" };
       }
       accessToken = retry.accessToken;
       result = await write(accessToken);
     }
-    // Lost access or Google unavailable: stop writing for this run.
-    if (!result.ok && (result.kind === "unauthorized" || result.kind === "unavailable" || result.kind === "revoked")) stopped = true;
+    // Lost access, rate-limited or Google unavailable: stop writing for this run.
+    if (!result.ok && (result.kind === "unauthorized" || result.kind === "unavailable" || result.kind === "revoked" || result.kind === "rate-limited")) {
+      stopped = true;
+      summary.stopReason ??= result.kind === "rate-limited" ? "rate_limited" : result.kind === "unavailable" ? "temporary_error" : "reconnect_required";
+    }
     return result;
   }
 

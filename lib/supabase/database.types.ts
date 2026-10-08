@@ -457,6 +457,69 @@ export type Database = {
           },
         ]
       }
+      google_calendar_sync_state: {
+        Row: {
+          consecutive_failures: number
+          created_at: string
+          last_attempt_at: string | null
+          last_created_count: number
+          last_deleted_count: number
+          last_failed_count: number
+          last_finished_at: string | null
+          last_imported_count: number
+          last_result: string | null
+          last_success_at: string | null
+          last_trigger: string | null
+          last_unchanged_count: number
+          last_updated_count: number
+          lease_token: string | null
+          lease_until: string | null
+          next_eligible_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          consecutive_failures?: number
+          created_at?: string
+          last_attempt_at?: string | null
+          last_created_count?: number
+          last_deleted_count?: number
+          last_failed_count?: number
+          last_finished_at?: string | null
+          last_imported_count?: number
+          last_result?: string | null
+          last_success_at?: string | null
+          last_trigger?: string | null
+          last_unchanged_count?: number
+          last_updated_count?: number
+          lease_token?: string | null
+          lease_until?: string | null
+          next_eligible_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          consecutive_failures?: number
+          created_at?: string
+          last_attempt_at?: string | null
+          last_created_count?: number
+          last_deleted_count?: number
+          last_failed_count?: number
+          last_finished_at?: string | null
+          last_imported_count?: number
+          last_result?: string | null
+          last_success_at?: string | null
+          last_trigger?: string | null
+          last_unchanged_count?: number
+          last_updated_count?: number
+          lease_token?: string | null
+          lease_until?: string | null
+          next_eligible_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       inbox_items: {
         Row: {
           content: string | null
@@ -629,6 +692,15 @@ export type Database = {
           reason: string
         }[]
       }
+      claim_google_calendar_sync: {
+        Args: { p_lease_seconds: number; p_trigger: string }
+        Returns: {
+          claimed: boolean
+          consecutive_failures: number
+          lease_token: string
+          reason: string
+        }[]
+      }
       create_project_from_canvas_course: {
         Args: {
           p_area?: string
@@ -664,6 +736,20 @@ export type Database = {
           p_result: string
           p_review?: number
           p_skipped?: number
+          p_unchanged?: number
+          p_updated?: number
+        }
+        Returns: boolean
+      }
+      finish_google_calendar_sync: {
+        Args: {
+          p_created?: number
+          p_deleted?: number
+          p_failed?: number
+          p_imported?: number
+          p_lease_token: string
+          p_next_eligible_seconds: number
+          p_result: string
           p_unchanged?: number
           p_updated?: number
         }

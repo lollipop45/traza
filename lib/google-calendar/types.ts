@@ -20,8 +20,10 @@ export type GoogleErrorKind =
   | "revoked"
   /** 401 after a refresh, or 403 (scope removed): the authorization no longer works. */
   | "unauthorized"
-  /** Network failure, timeout, 429 or 5xx. */
+  /** Network failure, timeout, 408 or 5xx. */
   | "unavailable"
+  /** 429, or a 403 whose reason is a rate limit (see http.ts). */
+  | "rate-limited"
   /** Unexpected status or a shape TRAZA cannot read. */
   | "invalid-response";
 

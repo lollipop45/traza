@@ -14,7 +14,9 @@ import { getEventsBetween } from "@/lib/calendar/queries";
 import { isEventId } from "@/lib/calendar/validation";
 import { calendarHref, lastDayOfMonth, resolveCalendarView } from "@/lib/calendar/view";
 import { CALLBACK_MESSAGES, isCallbackCode, isCallbackStage } from "@/lib/google-calendar/connection";
+import { requireUser } from "@/lib/auth/session";
 import { getGoogleCalendarStatus } from "@/lib/google-calendar/queries";
+import { getGoogleSyncStatus } from "@/lib/google-calendar/sync-state-store";
 import { getProjectOptions } from "@/lib/projects/queries";
 import { getPendingDeadlineTasks, getTasksDueBetween } from "@/lib/tasks/queries";
 
@@ -29,6 +31,7 @@ function plural(count: number, one: string, many: string): string {
 export default async function CalendarPage({ searchParams }: PageProps<"/calendar">) {
   // Navigation lives in the URL (?mes=YYYY-MM&dia=YYYY-MM-DD, plus ?nuevo or ?editar=<id> for the
   // event panel), so day cells and month arrows are plain links and no client state is needed.
+  const user = await requireUser();
   const { mes, dia, nuevo, editar, google, google_error: googleError } = await searchParams;
   const today = currentISODate();
   const { month, selected } = resolveCalendarView({ mes, dia }, today);
@@ -44,6 +47,8 @@ export default async function CalendarPage({ searchParams }: PageProps<"/calenda
     // Connection metadata only (no Google call): the page never waits on Google.
     getGoogleCalendarStatus(),
   ]);
+  // Automatic sync status: one row of the user's own sync state (no Google call).
+  const googleSync = await getGoogleSyncStatus(user.id, googleStatus);
   // ?google=<code> is set by the OAuth callback; only known codes are shown, never raw text. In
   // development the callback also sends ?google_error=<stage> (a fixed list) to locate failures.
   const diagnosticStage = process.env.NODE_ENV !== "production" && isCallbackStage(googleError) ? googleError : null;
@@ -106,7 +111,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/calenda
             }
           />
           <UpcomingDeadlines deadlines={deadlines} today={today} />
-          <GoogleCalendarSection status={googleStatus} notice={googleNotice} />
+          <GoogleCalendarSection status={googleStatus} sync={googleSync} notice={googleNotice} />
         </div>
       </div>
     </AppShell>

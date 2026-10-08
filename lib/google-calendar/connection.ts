@@ -49,12 +49,19 @@ export type ConnectionDeps = {
   store: ConnectionStore;
   fetch: FetchLike;
   now: () => number;
+  /**
+   * Automatic sync only: an undecryptable refresh token (usually a changed or missing
+   * GOOGLE_TOKEN_ENCRYPTION_KEY) is reported as "unreadable" and the stored connection is left
+   * untouched, so restoring the right key recovers it. Manual actions keep the original behaviour
+   * (mark the connection revoked so the user can reconnect).
+   */
+  keepUnreadableCredentials?: boolean;
 };
 
 /** Access tokens are refreshed this long before Google's expiry. */
 const EXPIRY_MARGIN_MS = 60_000;
 
-export type AccessFailure = "not-connected" | "revoked" | "unavailable" | "unauthorized" | "storage";
+export type AccessFailure = "not-connected" | "revoked" | "unreadable" | "unavailable" | "unauthorized" | "storage";
 export type AccessResult = { ok: true; accessToken: string } | { ok: false; kind: AccessFailure };
 
 function fromGoogle(kind: GoogleErrorKind): AccessFailure {
@@ -83,6 +90,7 @@ export async function getAccessToken(deps: ConnectionDeps, options: { forceRefre
   const refreshToken = decryptSecret(credentials.refreshCiphertext, keyring, tokenContext(deps.userId, "refresh"));
   if (!refreshToken) {
     // Unreadable (e.g. the encryption key was replaced without keeping the previous one).
+    if (deps.keepUnreadableCredentials) return { ok: false, kind: "unreadable" };
     await deps.store.markRevoked();
     return { ok: false, kind: "revoked" };
   }
@@ -302,6 +310,8 @@ export function accessFailureMessage(kind: AccessFailure): string {
       return "Google ya no permite a TRAZA leer tus calendarios. Vuelve a conectar Google Calendar.";
     case "storage":
       return "No se ha podido leer la conexión con Google.";
+    case "unreadable":
+      return "No se pueden leer las credenciales guardadas de Google. Vuelve a conectar Google Calendar.";
     default:
       return "Google Calendar no está disponible en este momento.";
   }

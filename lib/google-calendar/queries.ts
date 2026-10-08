@@ -7,6 +7,11 @@ import type { GoogleConnectionStatus } from "./types";
 // Server-only entry point for the Calendar page. Reads metadata only (no Google call, no tokens),
 // so rendering /calendar never depends on Google being reachable.
 
+/** Whether the GOOGLE_* server configuration is complete (no network, no secret leaves the server). */
+export function isGoogleCalendarConfigured(): boolean {
+  return readGoogleCalendarConfig().ok;
+}
+
 export async function getGoogleCalendarStatus(): Promise<GoogleConnectionStatus> {
   const user = await requireUser();
   if (!readGoogleCalendarConfig().ok) return { state: "not-configured" };

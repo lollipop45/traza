@@ -2,7 +2,8 @@
 
 // Manual Google Calendar sync. "Vista previa Google" plans and writes nothing; "Sincronizar Google
 // Calendar" carries out that same plan. Both are Server Actions returning aggregate counts and the
-// user's own titles/dates only. Nothing runs automatically.
+// user's own titles/dates only. The same engine also runs automatically, quietly, while TRAZA is
+// open (GoogleCalendarAutoSyncTrigger); these buttons run it right away.
 import { RefreshCw } from "lucide-react";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/Button";
