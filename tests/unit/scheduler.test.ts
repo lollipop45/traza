@@ -36,7 +36,7 @@ import { createAdminClient, isSupabaseSecretKey, readSupabaseSecretKey } from "@
 import { fakeAdmin } from "./helpers/fake-admin";
 import { ACCESS, config, independent, NEW_ACCESS, NOW as GOOGLE_NOW, REFRESH, setup } from "./helpers/google-fake";
 
-// The trusted background scheduler (Prompt 23). Everything is faked: no Supabase, no Canvas, no
+// The trusted background scheduler. Everything is faked: no Supabase, no Canvas, no
 // Google, no push service, no production URL, and only obviously fake secrets.
 
 const ROOT = process.cwd();
@@ -337,7 +337,7 @@ describe("no user impersonation: scheduled work is system work, not a sign-in", 
     assert.match(server, /await cookies\(\)/);
     const session = code("lib/auth/session.ts");
     assert.match(session, /supabase\.auth\.getClaims\(\)/);
-    for (const file of ["lib/supabase/server.ts", "lib/auth/session.ts", "lib/supabase/client.ts", "lib/supabase/proxy.ts"]) {
+    for (const file of ["lib/supabase/server.ts", "lib/auth/session.ts", "lib/supabase/proxy.ts"]) {
       assert.doesNotMatch(code(file), /scheduler|lib\/supabase\/admin|createAdminClient|user-scope|AsyncLocalStorage/i, file);
     }
     for (const file of [

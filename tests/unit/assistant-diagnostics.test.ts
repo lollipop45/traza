@@ -1,75 +1,23 @@
-// The (inactive) Gemini request budget (root cause of the first real failure: thinking tokens exhausting
-// maxOutputTokens) and the DEVELOPMENT-ONLY diagnostics of the provider path. Fake fetch / fake
-// provider only; no network, fake key.
+// The provider path's safe failure stages (through the active Groq adapter) and the DEVELOPMENT-ONLY
+// diagnostics of the assistant turn. Fake fetch / fake provider only; no network, fake key.
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { MAX_OUTPUT_TOKENS, THINKING_BUDGET, createGeminiProvider, readResponse, requestBody } from "@/lib/ai/gemini";
+import { createGroqProvider } from "@/lib/ai/groq";
 import type { AiProvider, AiRequest, AiResult } from "@/lib/ai/types";
 import { diagnosticLine } from "@/lib/assistant/diagnostics";
 import { REPLY_SCHEMA } from "@/lib/assistant/prompt";
 import { analyzeReply } from "@/lib/assistant/response";
 import { runAssistantTurn, TURN_ERRORS, type AssistantStore } from "@/lib/assistant/turn";
 
-const FAKE_KEY = "AIzaFAKE-gemini-key-not-real-0123456789";
+const FAKE_KEY = "gsk_FAKE-groq-key-not-real-0123456789abcdef";
 const request: AiRequest = { system: "Reglas y DATOS privados: Imprimir planos", turns: [{ role: "user", text: "¿Qué tengo mañana?" }], schema: REPLY_SCHEMA };
 const refs = { projectRefs: new Map<string, string>(), projectIds: new Set<string>() };
 
-const candidate = (finishReason: string, parts: unknown[], usage: Record<string, number> = {}) =>
-  Response.json({ candidates: [{ content: { role: "model", parts }, finishReason }], usageMetadata: usage });
-
 function provider(respond: () => Response | Promise<Response>) {
-  return createGeminiProvider({ apiKey: FAKE_KEY, model: "gemini-2.5-flash" }, async () => respond(), { sleep: async () => {}, random: () => 0.5, now: () => 0 });
+  return createGroqProvider({ apiKey: FAKE_KEY, model: "openai/gpt-oss-20b" }, async () => respond(), { sleep: async () => {}, random: () => 0.5, now: () => 0 });
 }
 
-describe("Gemini request budget (root cause)", () => {
-  it("bounds thinking and leaves room for the JSON answer on Gemini 2.5", () => {
-    const config = requestBody("gemini-2.5-flash", request).generationConfig as Record<string, unknown>;
-    assert.deepEqual(config.thinkingConfig, { thinkingBudget: THINKING_BUDGET });
-    assert.equal(config.maxOutputTokens, MAX_OUTPUT_TOKENS);
-    assert.ok(MAX_OUTPUT_TOKENS - THINKING_BUDGET >= 4096, "thinking can never consume the answer's budget");
-    assert.equal(config.responseMimeType, "application/json");
-    assert.equal((config.responseSchema as Record<string, unknown>).type, "OBJECT");
-  });
-
-  it("does not send thinkingConfig to models that do not accept a thinking budget", () => {
-    for (const model of ["gemini-2.0-flash", "gemini-1.5-pro"]) {
-      const config = requestBody(model, request).generationConfig as Record<string, unknown>;
-      assert.equal(config.thinkingConfig, undefined, model);
-    }
-    assert.ok((requestBody("gemini-2.5-pro", request).generationConfig as Record<string, unknown>).thinkingConfig);
-  });
-});
-
-describe("Gemini response stages", () => {
-  it("reports the old failure precisely: thinking used the budget, the answer was cut (max_tokens)", () => {
-    const truncated = readResponse({
-      candidates: [{ content: { parts: [{ text: '{"message":"Mañana tienes' }] }, finishReason: "MAX_TOKENS" }],
-      usageMetadata: { promptTokenCount: 9120, thoughtsTokenCount: 2000, candidatesTokenCount: 48 },
-    });
-    assert.deepEqual(truncated, {
-      ok: false,
-      kind: "invalid-response",
-      diagnostic: { stage: "max_tokens", candidates: 1, finishReason: "MAX_TOKENS", tokens: { prompt: 9120, thoughts: 2000, output: 48 } },
-    });
-    const noParts = readResponse({ candidates: [{ content: { role: "model" }, finishReason: "MAX_TOKENS" }] });
-    assert.equal(noParts.ok ? null : noParts.diagnostic?.stage, "max_tokens");
-  });
-
-  it("distinguishes empty candidates, safety blocks and empty text", () => {
-    const stage = (body: unknown) => {
-      const result = readResponse(body);
-      return result.ok ? "ok" : result.diagnostic?.stage;
-    };
-    assert.equal(stage({ candidates: [] }), "empty_candidates");
-    assert.equal(stage({}), "empty_candidates");
-    assert.equal(stage({ promptFeedback: { blockReason: "SAFETY" } }), "safety_block");
-    for (const reason of ["SAFETY", "PROHIBITED_CONTENT", "RECITATION", "BLOCKLIST", "SPII"]) assert.equal(stage({ candidates: [{ finishReason: reason }] }), "safety_block", reason);
-    assert.equal(stage({ candidates: [{ content: { parts: [] }, finishReason: "STOP" }] }), "empty_text");
-    assert.equal(stage({ candidates: [{ content: { parts: [{ text: "pensando", thought: true }] }, finishReason: "STOP" }] }), "empty_text");
-    assert.equal(stage("not an object"), "unexpected_response");
-    assert.equal(stage({ candidates: [{ content: { parts: [{ text: '{"message":"ok","actions":[]}' }] }, finishReason: "STOP" }] }), "ok");
-  });
-
+describe("provider failure stages", () => {
   it("maps HTTP and network failures to stages, with the status only", async () => {
     // Transient statuses are retried until the attempts run out (4); the others are final at once.
     const cases: [() => Response, string, number, number][] = [
@@ -97,12 +45,6 @@ describe("Gemini response stages", () => {
       throw new DOMException("timed out", "TimeoutError");
     }).generate(request);
     assert.equal(timeout.ok ? null : timeout.diagnostic?.stage, "timeout");
-  });
-
-  it("succeeds with safe metadata on a normal answer", async () => {
-    const result = await provider(() => candidate("STOP", [{ text: '{"message":"Mañana no tienes nada.","actions":[]}' }], { promptTokenCount: 5000, thoughtsTokenCount: 300, candidatesTokenCount: 20 })).generate(request);
-    assert.ok(result.ok);
-    assert.deepEqual(result.diagnostic, { stage: null, candidates: 1, finishReason: "STOP", tokens: { prompt: 5000, thoughts: 300, output: 20 }, status: 200, attempts: 1, elapsedMs: 0 });
   });
 });
 
@@ -156,10 +98,10 @@ describe("turn diagnostics", () => {
 
   it("formats a safe one-line diagnostic: whitelisted fields only", () => {
     assert.equal(
-      diagnosticLine({ stage: "max_tokens", status: 200, finishReason: "MAX_TOKENS", candidates: 1, tokens: { prompt: 9120, thoughts: 2000, output: 48 } }, "gemini-2.5-flash"),
-      "stage=max_tokens status=200 finish=MAX_TOKENS candidates=1 tokens=prompt:9120,thoughts:2000,output:48 model=gemini-2.5-flash",
+      diagnosticLine({ stage: "max_tokens", status: 200, finishReason: "MAX_TOKENS", candidates: 1, tokens: { prompt: 9120, thoughts: 2000, output: 48 } }, "openai/gpt-oss-20b"),
+      "stage=max_tokens status=200 finish=MAX_TOKENS candidates=1 tokens=prompt:9120,thoughts:2000,output:48 model=openai/gpt-oss-20b",
     );
-    assert.equal(diagnosticLine({ stage: "provider_5xx", status: 503, attempts: 4 }, "gemini-3.8-flash"), "stage=provider_5xx status=503 attempts=4 model=gemini-3.8-flash");
+    assert.equal(diagnosticLine({ stage: "provider_5xx", status: 503, attempts: 4 }, "llama-3.3-70b-versatile"), "stage=provider_5xx status=503 attempts=4 model=llama-3.3-70b-versatile");
     // Anything outside the vocabulary is dropped, so no text can leak through the line.
     const hostile = diagnosticLine({ stage: `x ${FAKE_KEY}` as never, finishReason: "Imprimir planos", status: Number.NaN }, "../evil model");
     assert.equal(hostile, "stage=none");

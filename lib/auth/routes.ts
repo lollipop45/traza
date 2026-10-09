@@ -21,10 +21,5 @@ export function isServerToServerPath(pathname: string): boolean {
 
 /** Routes reachable without a session. Everything else is the private TRAZA app. */
 export function isPublicPath(pathname: string): boolean {
-  return (
-    pathname === LOGIN_PATH ||
-    PUBLIC_PWA_PATHS.has(pathname) ||
-    // Temporary dev diagnostics; the page itself returns 404 in production.
-    pathname.startsWith("/dev/")
-  );
+  return pathname === LOGIN_PATH || PUBLIC_PWA_PATHS.has(pathname);
 }

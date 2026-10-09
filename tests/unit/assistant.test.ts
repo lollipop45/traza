@@ -1,17 +1,15 @@
-// The TRAZA assistant: structured-output validation, context projection, Canary dates, the Gemini
-// adapter (fake fetch), one conversation turn and the confirmation path — all with a deterministic
+// The TRAZA assistant: structured-output validation, context projection, Canary dates, one
+// conversation turn and the confirmation path — all with a deterministic
 // FAKE provider and in-memory stores. No network, no real AI call, fake keys only.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { describe, it } from "node:test";
-import { readAiConfig } from "@/lib/ai/env";
-import { createGeminiProvider, extractText, toGeminiSchema } from "@/lib/ai/gemini";
 import type { AiProvider, AiRequest, AiResult } from "@/lib/ai/types";
 import { canaryNow, upcomingDays, weekOf } from "@/lib/assistant/clock";
 import { confirmProposals, confirmSummary, type ConfirmDeps, type StoredAction } from "@/lib/assistant/confirm";
 import { buildAssistantContext, CONTEXT_LIMITS, mentionedProjects, type ContextSource } from "@/lib/assistant/context";
 import { actionView, relativeDay } from "@/lib/assistant/format";
-import { REPLY_SCHEMA, systemPrompt } from "@/lib/assistant/prompt";
+import { systemPrompt } from "@/lib/assistant/prompt";
 import { checkProposal } from "@/lib/assistant/proposals";
 import { parseReply, replyText } from "@/lib/assistant/response";
 import { runAssistantTurn, TURN_ERRORS, type AssistantStore, type HistoryEntry } from "@/lib/assistant/turn";
@@ -23,7 +21,7 @@ const P_TALLER = "11111111-1111-4111-8111-111111111111";
 const P_TRAZA = "22222222-2222-4222-8222-222222222222";
 const P_OLD = "33333333-3333-4333-8333-333333333333";
 const FOREIGN = "99999999-9999-4999-8999-999999999999";
-const FAKE_KEY = "AIzaFAKE-gemini-key-not-real-0123456789";
+const FAKE_KEY = "gsk_FAKE-groq-key-not-real-0123456789abcdef";
 
 const source = (): ContextSource => ({
   projects: [
@@ -239,7 +237,7 @@ describe("assistant context", () => {
 
   it("contains no ids, tokens, keys or other secrets", () => {
     const env = {
-      GEMINI_API_KEY: FAKE_KEY,
+      GROQ_API_KEY: FAKE_KEY,
       CANVAS_ACCESS_TOKEN: "7~FAKEcanvasTOKEN",
       GOOGLE_CLIENT_SECRET: "GOCSPX-FAKE",
       GOOGLE_TOKEN_ENCRYPTION_KEY: "FAKEKEYbase64==",
@@ -296,91 +294,6 @@ describe("assistant dates", () => {
     assert.equal(task?.fields[0].value, "Miércoles, 7 de octubre · mañana");
     assert.equal(task?.state, "executed");
     assert.equal(actionView({ id: "a3", action_type: "delete_task", state: "proposed", payload: {} }, names, "2026-10-06"), null);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Gemini adapter (fake fetch)
-// ---------------------------------------------------------------------------
-
-type FetchCall = { url: string; init: RequestInit };
-
-function geminiWith(respond: (call: FetchCall) => Response | Promise<Response>) {
-  const calls: FetchCall[] = [];
-  const provider = createGeminiProvider(
-    { apiKey: FAKE_KEY, model: "gemini-2.5-flash" },
-    async (url, init) => {
-      calls.push({ url, init });
-      return respond({ url, init });
-    },
-    // Retries happen instantly in tests (the policy itself is tested in assistant-retry.test.ts).
-    { sleep: async () => {}, random: () => 0.5, now: () => 0 },
-  );
-  return { provider, calls };
-}
-
-const request: AiRequest = { system: "Reglas", turns: [{ role: "user", text: "Hola" }, { role: "user", text: "¿Qué tengo?" }], schema: REPLY_SCHEMA };
-const candidate = (text: string) => Response.json({ candidates: [{ content: { role: "model", parts: [{ text }] }, finishReason: "STOP" }] });
-
-describe("Gemini provider", () => {
-  it("is no longer enabled by GEMINI_API_KEY (Groq is the active provider)", () => {
-    assert.equal(readAiConfig({ GEMINI_API_KEY: FAKE_KEY }), null);
-  });
-
-  it("sends the key only in a header, asks for JSON with the schema, and declares no tools", async () => {
-    const { provider, calls } = geminiWith(() => candidate('{"message":"Hola","actions":[]}'));
-    const answer = await provider.generate(request);
-    assert.ok(answer.ok);
-    assert.equal(answer.text, '{"message":"Hola","actions":[]}');
-    const [{ url, init }] = calls;
-    assert.equal(url, "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent");
-    assert.ok(!url.includes(FAKE_KEY));
-    assert.equal(new Headers(init.headers).get("x-goog-api-key"), FAKE_KEY);
-    assert.equal(init.redirect, "manual");
-    const body = JSON.parse(String(init.body));
-    assert.equal(body.generationConfig.responseMimeType, "application/json");
-    assert.equal(body.generationConfig.responseSchema.type, "OBJECT");
-    assert.deepEqual(body.generationConfig.responseSchema.properties.actions.items.properties.type.enum, ["create_task", "create_event", "create_note", "create_idea"]);
-    assert.equal(body.tools, undefined);
-    // Consecutive user turns are merged.
-    assert.deepEqual(body.contents, [{ role: "user", parts: [{ text: "Hola\n\n¿Qué tengo?" }] }]);
-  });
-
-  it("maps failures to categories without provider text", async () => {
-    const leaky = (status: number) => () => Response.json({ error: { message: `quota for ${FAKE_KEY}` } }, { status });
-    const cases: [() => Response | Promise<Response>, string][] = [
-      [leaky(429), "rate-limited"],
-      [leaky(503), "unavailable"],
-      [leaky(500), "unavailable"],
-      [leaky(400), "rejected"],
-      [leaky(403), "rejected"],
-      [() => new Response("<html>", { status: 200 }), "invalid-response"],
-      [() => Response.json({ candidates: [] }), "invalid-response"],
-      [() => Response.json({ promptFeedback: { blockReason: "SAFETY" } }), "invalid-response"],
-      [
-        () => {
-          throw new DOMException("The operation timed out.", "TimeoutError");
-        },
-        "timeout",
-      ],
-      [
-        () => {
-          throw new TypeError(`fetch failed ${FAKE_KEY}`);
-        },
-        "unavailable",
-      ],
-    ];
-    for (const [respond, kind] of cases) {
-      const result = await geminiWith(respond).provider.generate(request);
-      assert.equal(result.ok, false);
-      assert.equal(result.ok ? "" : result.kind, kind);
-      assert.ok(!JSON.stringify(result).includes(FAKE_KEY));
-    }
-  });
-
-  it("ignores 'thought' parts and converts the schema dialect", () => {
-    assert.equal(extractText({ candidates: [{ content: { parts: [{ text: "pienso…", thought: true }, { text: '{"a":1}' }] } }] }), '{"a":1}');
-    assert.deepEqual(toGeminiSchema({ type: "string", enum: ["a"], nullable: true }), { type: "STRING", nullable: true, format: "enum", enum: ["a"] });
   });
 });
 

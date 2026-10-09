@@ -14,17 +14,17 @@ Ambas son públicas por diseño: lo que protege los datos es RLS, no la clave. *
 ## Clientes
 
 - `lib/supabase/server.ts` → `createClient()` asíncrono para Server Components, Server Actions y Route Handlers (cookies vía `next/headers`). Crear uno por petición.
-- `lib/supabase/client.ts` → `createClient()` para Client Components, solo cuando sea imprescindible.
 - `lib/supabase/proxy.ts` → `updateSession()`, usado por `proxy.ts` (Next 16 renombró `middleware.ts`).
+- `lib/supabase/admin.ts` → cliente privilegiado, solo para el programador de producción.
 
-Ambos clientes usan el tipo generado `Database`.
+No hay cliente de Supabase en el navegador: todas las lecturas y escrituras pasan por el servidor con la sesión del usuario. Los clientes usan el tipo generado `Database`.
 
 ## Autenticación
 
 Correo + contraseña con Supabase Auth y sesiones en cookies (`@supabase/ssr`). Sin registro público ni proveedores OAuth.
 
 - `proxy.ts` → en cada petición (salvo estáticos) refresca la sesión con `getClaims()` y aplica las rutas: sin sesión todo redirige a `/login`; con sesión, `/login` redirige a `/`. Rutas públicas en `lib/auth/routes.ts`.
-- `app/(app)/layout.tsx` → segunda capa: verifica las claims en el servidor (`requireUser()`) antes de renderizar Inicio, Calendario, Inbox, Proyectos y Asistente.
+- `app/(app)/layout.tsx` → segunda capa: verifica las claims en el servidor (`requireUser()`) antes de renderizar Inicio, Calendario, Inbox, Proyectos, Asistente y Ajustes.
 - `lib/auth/actions.ts` → Server Actions `signIn` (mensaje de error único, no revela si el correo existe) y `signOut` (revoca la sesión de este dispositivo).
 - Identidad: siempre `getClaims()` (JWT verificado), nunca `getSession()`.
 - Las Server Actions que lean o escriban datos deben llamar a `requireUser()`: el proxy no basta.
@@ -57,11 +57,11 @@ Tras aplicar las migraciones (requiere `link`):
 npm run db:types    # genera lib/supabase/database.types.ts
 ```
 
-Después, tipar los clientes: `createServerClient<Database>(…)` y `createBrowserClient<Database>(…)` con `import type { Database } from "./database.types"`. Los tipos generados no se escriben a mano. En Windows, ejecutar el script desde `npm run` (usa cmd) y no con redirección de PowerShell, que escribe UTF-16.
+Los clientes se tipan con `createServerClient<Database>(…)` e `import type { Database } from "./database.types"`. Los tipos generados no se escriben a mano. En Windows, ejecutar el script desde `npm run` (usa cmd) y no con redirección de PowerShell, que escribe UTF-16.
 
 ## Comprobación
 
-Con `npm run dev`, abrir `/dev/supabase` (solo existe en desarrollo). Distingue: configuración ausente · sin conexión · migración pendiente · sin sesión con acceso bloqueado (esperado) · alerta si el acceso anónimo funciona · sesión sin privilegios (falta la migración de privilegios) · sesión con acceso seguro (`foreignRows` debe ser 0). Ruta temporal: borrar `app/dev/` cuando haya datos reales en la interfaz.
+La conexión se comprueba usando la aplicación: con `npm run dev`, inicia sesión en `/login` y crea una tarea en Inicio. RLS, privilegios y claves foráneas por dueño se verifican con `npm run test:db` (usuarios ficticios A y B, anónimo, `service_role`). TRAZA no tiene rutas de diagnóstico (`/dev/*` no existe).
 
 ## Pruebas
 
@@ -81,9 +81,9 @@ Las pruebas de base de datos no usan red ni credenciales: comprueban restriccion
 
 `public.calendar_events` (`20261005162926_create_calendar_events.sql`):
 
-- **Fechas y horas locales**: `event_date date` + `start_time` / `end_time time` (sin zona horaria) guardan la hora de pared de Atlantic/Canary tal como se escribe; ninguna conversión UTC puede mover un evento de día u hora. Eventos de todo el día: `all_day = true` y sin horas. Una importación con timestamps (Google Calendar) deberá convertir a hora de Canarias al escribir.
+- **Fechas y horas locales**: `event_date date` + `start_time` / `end_time time` (sin zona horaria) guardan la hora de pared de Atlantic/Canary tal como se escribe; ninguna conversión UTC puede mover un evento de día u hora. Eventos de todo el día: `all_day = true` y sin horas. La importación de Google Calendar convierte sus instantes a hora de Canarias al escribir.
 - **Proyecto**: misma clave compuesta que las tareas (`calendar_events_project_owner_fkey`); borrar el proyecto conserva el evento sin proyecto.
-- **Importaciones**: índice único `(user_id, source, external_id)` cuando hay `external_id`. Los clientes no pueden escribir `source` ni `external_id`: los eventos manuales son siempre `manual` y las integraciones futuras irán en el servidor.
+- **Importaciones**: índice único `(user_id, source, external_id)` cuando hay `external_id`. Los clientes no pueden escribir `source` ni `external_id`: los eventos manuales son siempre `manual` y las integraciones (Google Calendar) escriben desde el servidor.
 - **Entregas**: las tareas con `due_date` **no** se copian a esta tabla. El calendario combina al renderizar los eventos y las tareas con fecha (`lib/calendar/items.ts`, modelo `CalendarItem`).
 - **Inicio**: "Próximos eventos" muestra solo los eventos de hoy (todo el día primero, luego por hora); las tareas siguen en su sección.
 
@@ -104,7 +104,7 @@ Variables **solo de servidor** (sin prefijo `NEXT_PUBLIC_`), en `.env.local` dur
 
 Obtener el token: en Campus Virtual → **Cuenta → Configuración → Integraciones aprobadas → + Nuevo token de acceso**, con una finalidad ("TRAZA") y una fecha de caducidad; cópialo en ese momento (Canvas no vuelve a mostrarlo). Reinicia `npm run dev` tras editar `.env.local`. Para revocarlo, bórralo en esa misma pantalla.
 
-Comprobación: `/dev/canvas` (solo en desarrollo y con sesión de TRAZA) muestra la conexión, tu usuario de Canvas y tus cursos activos. Llamadas usadas: `GET /api/v1/users/self` y `GET /api/v1/courses?enrollment_state=active&include[]=term&per_page=100` (paginación por la cabecera `Link`). No se escribe nada en Supabase.
+Comprobación: `/projects/canvas` (con sesión de TRAZA) muestra el estado de la conexión y tus cursos activos. Llamadas usadas: `GET /api/v1/users/self` y `GET /api/v1/courses?enrollment_state=active&include[]=term&per_page=100` (paginación por la cabecera `Link`). No se escribe nada en Supabase.
 
 **Vinculación de cursos** (`/projects/canvas`, enlace "Campus" en Proyectos): cada curso de Canvas se identifica por su **ID de Canvas**, nunca por el nombre. Para cada curso decides: vincularlo a un proyecto existente, crear un proyecto desde él (operación atómica, función `create_project_from_canvas_course`, SECURITY INVOKER) o ignorarlo. Las decisiones viven en `public.canvas_course_links` (`linked` con proyecto / `ignored` sin proyecto; sin fila = sin vincular), con instantánea del nombre y código del curso. Antes de guardar, el servidor vuelve a leer tus cursos de Canvas y solo acepta un ID que esté ahí; el nombre y el código salen de esa respuesta, nunca del navegador. Borrar un proyecto borra sus vínculos (el curso vuelve a "sin vincular"). El token de Canvas nunca se guarda en la base de datos.
 
@@ -167,7 +167,7 @@ Migración `20261007083209_canvas_sync_state.sql`. Campus se sincroniza solo, si
 - **Importación conservadora:** igual que la manual: solo entregas claramente accionables o las que marcaste "Importar"; lo dudoso queda en "Revisar" (la página muestra "N requieren revisión") y nunca se aprueba solo; notas y asistencia se omiten; "Ignorar" siempre gana. Una entrega que desaparece de una respuesta no borra su tarea. La propiedad de campos no cambia: Campus actualiza título, fecha y proyecto; prioridad y "hecha" son tuyas (Campus solo puede marcarla hecha con prueba clara de entrega, nunca devolverla a pendiente).
 - **Página de Campus:** bloque "Sincronización automática" con la última sincronización ("Hace 12 min"), el estado (`ACTUALIZADO`, `SIN SINCRONIZAR`, `EN CURSO`, `REVISAR CONEXIÓN`, `ERROR TEMPORAL`) y "Próxima comprobación: Automática". Sin detalles de errores.
 - **Diagnóstico (solo desarrollo):** la consola del servidor muestra `TRAZA Canvas auto-sync: outcome=… trigger=… courses=… seen=… imported=… updated=… unchanged=… ignored=… review=… duration=…ms [code=…]` (no para `not_due`). Solo enumerados y números. En producción no se registra nada.
-- **Futuro programador:** una ejecución sin usuario conectado (cron) necesitará su propia autorización de confianza; podrá reutilizar `runCanvasSync` y `canvas_sync_state`, pero no está implementada y no debe simularse guardando sesiones.
+- **Con la app cerrada:** el programador de producción (Supabase Cron → `POST /api/internal/scheduler`) ejecuta el mismo motor con el disparo `automatic`, el mismo turno y la misma espera, sin guardar ni crear sesiones. Ver [docs/production.md](production.md).
 
 **Proyectos · próximo hito:** se deriva al leer (no se guarda): la tarea pendiente con fecha ≥ hoy o el evento del calendario ≥ hoy del proyecto, el más próximo; el mismo día gana la tarea.
 
@@ -304,12 +304,12 @@ Migración `20261006141207_assistant.sql`. Pantalla `/assistant`.
    - opcional: `GROQ_MODEL=openai/gpt-oss-20b` (es el valor por defecto).
 3. Reinicia `npm run dev`. Sin la clave, la pantalla funciona pero el campo de texto queda desactivado y no se guarda nada.
 
-La clave nunca sale del servidor: va en la cabecera `Authorization: Bearer …`, no se registra, no se guarda en la base de datos y no llega al navegador. Los errores del proveedor se convierten en frases fijas ("El asistente no está disponible en este momento."). `GEMINI_API_KEY` / `GEMINI_MODEL` ya no se leen.
+La clave nunca sale del servidor: va en la cabecera `Authorization: Bearer …`, no se registra, no se guarda en la base de datos y no llega al navegador. Los errores del proveedor se convierten en frases fijas ("El asistente no está disponible en este momento.").
 
 ### Cómo funciona
 
 - **El modelo nunca escribe.** No tiene herramientas ni acceso a Supabase: recibe instrucciones + un bloque de datos y devuelve JSON (`message` + `actions`) con esquema estructurado (`lib/assistant/prompt.ts`). Solo TRAZA escribe, y solo tras la confirmación del usuario.
-- **Proveedor:** `lib/ai/types.ts` (contrato neutro), `lib/ai/provider.ts` (solo servidor; elige el proveedor activo), `lib/ai/groq.ts` (**activo**: REST `POST https://api.groq.com/openai/v1/chat/completions`), `lib/ai/retry.ts` (reintentos y errores HTTP, comunes). `lib/ai/gemini.ts` sigue en el repositorio, **inactivo**: nada de la aplicación lo importa. Las pruebas usan `fetch` falso; ninguna llama a Groq ni a Gemini.
+- **Proveedor:** `lib/ai/types.ts` (contrato neutro), `lib/ai/provider.ts` (solo servidor; elige el proveedor activo), `lib/ai/groq.ts` (REST `POST https://api.groq.com/openai/v1/chat/completions`), `lib/ai/retry.ts` (reintentos y errores HTTP). El adaptador anterior de Gemini se eliminó en la versión 1.0. Las pruebas usan `fetch` falso; ninguna llama a Groq.
 - **Petición a Groq:** `model` (por defecto `openai/gpt-oss-20b`), `messages` (sistema + conversación), `response_format: { type: "json_schema", json_schema: { name: "traza_assistant_response", strict: true, schema } }`, `reasoning_effort: "low"`, razonamiento oculto, `temperature: 0.2`, `max_completion_tokens: 8192`, `stream: false`; sin herramientas, búsqueda ni ejecución de código. Razonamiento oculto: en `openai/gpt-oss-*` Groq no admite `reasoning_format`, así que se envía `include_reasoning: false`; en modelos que lo admiten (`qwen/qwen3*`) se envía `reasoning_format: "hidden"`. Nunca se lee un campo de razonamiento. Se usa `choices[0].message.content`.
 - **Esquema estricto:** el esquema de TRAZA se convierte al modo estricto (`toStrictSchema`): todas las propiedades en `required`, `additionalProperties: false` en todos los objetos, y lo opcional como unión con `null` (`["string", "null"]`; un `enum` admite `null`). `maxItems` no se envía; TRAZA limita las propuestas a 6. La validación propia de TRAZA se mantiene igual: la salida estricta no es una garantía de confianza.
 - **Contexto acotado** (`lib/assistant/context.ts`): fecha y hora reales de **Atlantic/Canary** (no del servidor), tabla de los próximos 15 días con su día de la semana, esta semana y la siguiente; proyectos activos/planificados (máx. 40) con referencias cortas `P1…` válidas solo en esa petición; tareas pendientes (máx. 80, vencidas marcadas; si el mensaje nombra un proyecto, las suyas primero); tareas hechas en los últimos 14 días (máx. 15); eventos de ayer a +60 días (máx. 60); últimas 15 notas/ideas (extracto de 300). Nunca ids, `user_id`, ids de Canvas o Google, tokens, claves, correos ni errores. Historial: los últimos 12 mensajes.
@@ -322,9 +322,9 @@ La clave nunca sale del servidor: va en la cabecera `Authorization: Bearer …`,
 - **Inyección de instrucciones:** títulos, notas, entregas de Campus y eventos de Google van como JSON dentro de `<datos>`, después de las reglas, que dicen expresamente que ese contenido son datos y no puede cambiar instrucciones ni permisos. Aun así, el modelo no tiene ningún poder: lo peor que podría hacer es proponer algo, y nada ocurre sin la confirmación del usuario.
 - **Historial:** solo lo visible (mensajes del usuario y respuestas). Nunca razonamiento interno del modelo, *prompts* ni detalles del proveedor. "Nueva" empieza otra conversación; la pantalla muestra la más reciente.
 - **Fallos:** sin clave → no se guarda nada; proveedor caído, límite de peticiones, tiempo agotado o respuesta mal formada → el mensaje del usuario queda guardado, no se crea nada y se muestra una frase fija.
-- **Presupuesto de salida (Gemini 2.5, adaptador inactivo):** los tokens de "pensamiento" cuentan dentro de `maxOutputTokens`. Por eso se fija `thinkingConfig.thinkingBudget = 1024` (solo en modelos `gemini-2.5-*`) y `maxOutputTokens = 8192`; con el límite anterior (2048, sin presupuesto) el modelo podía gastarlo todo pensando y devolver la respuesta cortada (`finishReason: MAX_TOKENS`). Una respuesta cortada se rechaza sin intentar leerla.
+- **Presupuesto de salida:** el razonamiento cuenta dentro de `max_completion_tokens` (8192); con `reasoning_effort: "low"` queda espacio de sobra para el JSON. Una respuesta cortada (`finish_reason: length`) se rechaza sin intentar leerla.
 - **Reintentos (solo fallos transitorios):** 408, 429, 500, 502, 503, 504, errores de red y tiempo agotado se reintentan hasta **4 intentos** en total, esperando ~1 s, ~2 s y ~4 s (±25 % de variación aleatoria). Cada intento tiene 20 s como máximo y la llamada completa (intentos + esperas) 60 s: un reintento que no cabría con al menos 5 s no se hace. Nunca se reintentan 400/401/403, una respuesta 200 mal formada, bloqueada o cortada, ni lo que rechaza la validación del asistente. Los reintentos ocurren dentro del adaptador del proveedor (`lib/ai/retry.ts`): el mensaje del usuario y las propuestas se guardan una sola vez. Si un reintento funciona, no se muestra ningún error; si se agotan, se muestra la frase fija de siempre.
-- **Diagnóstico (solo en desarrollo):** cada envío escribe en la consola del servidor una línea `TRAZA assistant diagnostic: provider=groq stage=… status=… attempts=… elapsed=…ms finish=… candidates=… tokens=prompt:…,thoughts:…,output:… model=…` (`candidates` = número de *choices*); si falla, el mensaje de error añade `(Diagnóstico: <etapa>)`. Etapas: `request_failed`, `timeout`, `http_408`, `http_400`, `http_401`, `http_403`, `http_429`, `provider_5xx`, `empty_choices`, `empty_candidates`, `safety_block`, `max_tokens`, `empty_text`, `unexpected_response`, `invalid_json`, `schema_validation`; y, si la respuesta es válida pero se descartan propuestas, `unsupported_action` / `malformed_action`. Solo vocabulario fijo, enumerados y números: nunca la clave, cabeceras, el *prompt*, tus datos, el texto del modelo ni el cuerpo de la respuesta. En producción no se registra nada y solo se ve la frase fija.
+- **Diagnóstico (solo en desarrollo):** cada envío escribe en la consola del servidor una línea `TRAZA assistant diagnostic: provider=groq stage=… status=… attempts=… elapsed=…ms finish=… candidates=… tokens=prompt:…,thoughts:…,output:… model=…` (`candidates` = número de *choices*); si falla, el mensaje de error añade `(Diagnóstico: <etapa>)`. Etapas: `request_failed`, `timeout`, `http_408`, `http_400`, `http_401`, `http_403`, `http_429`, `provider_5xx`, `empty_choices`, `safety_block`, `max_tokens`, `empty_text`, `unexpected_response`, `invalid_json`, `schema_validation`; y, si la respuesta es válida pero se descartan propuestas, `unsupported_action` / `malformed_action`. Solo vocabulario fijo, enumerados y números: nunca la clave, cabeceras, el *prompt*, tus datos, el texto del modelo ni el cuerpo de la respuesta. En producción no se registra nada y solo se ve la frase fija.
 
 ## PWA y notificaciones
 
@@ -334,7 +334,7 @@ Migración `20261008083736_notifications.sql`. Ajustes en `/settings` (icono jun
 
 - **Manifiesto:** `app/manifest.ts` (`/manifest.webmanifest`): TRAZA, `standalone`, `start_url` `/`, fondo y tema `#F4F2ED`, `es`, sin bloqueo de orientación. Iconos locales en `public/icons` (192/512 normales y *maskable*, `apple-touch-icon` 180, insignia 96) y `app/favicon.ico`, generados con `node scripts/generate-icons.mjs` (sin dependencias) desde la marca oficial `public/brand/traza-mark.svg`, el maestro vectorial (vectorizado del original `brand/traza-mark-source.png`, que queda fuera de `public`). El mismo script genera `public/brand/traza-mark.png` (maestro transparente de 1024 px). La marca en la interfaz es `components/ui/TrazaMark.tsx`, con la misma geometría; `public/offline.html` la lleva en línea. Si cambian los iconos, sube `VERSION` en `public/sw.js` para que los dispositivos instalados los vuelvan a descargar.
 - **Metadatos:** `appleWebApp` (título TRAZA, barra de estado `default`), `viewport-fit=cover`, zoom permitido.
-- **Service worker** (`public/sw.js`, registrado por `components/pwa/PwaRegistrar.tsx`): **no guarda datos privados**. Precarga solo `/offline.html` y los iconos en una caché versionada (`traza-static-v1`); al activarse borra cualquier caché anterior. Las navegaciones van siempre a la red; solo si la red falla se muestra la página genérica "Sin conexión". Nunca se guardan páginas, API, Server Actions, Supabase, Canvas, Google, mensajes del asistente ni sesiones. Se sirve con `Cache-Control: no-store` y CSP `'self'`. Para actualizarlo, sube `VERSION`.
+- **Service worker** (`public/sw.js`, registrado por `components/pwa/PwaRegistrar.tsx`): **no guarda datos privados**. Precarga solo `/offline.html` y los iconos en una caché versionada (`traza-static-v2`); al activarse borra cualquier caché anterior. Las navegaciones van siempre a la red; solo si la red falla se muestra la página genérica "Sin conexión". Nunca se guardan páginas, API, Server Actions, Supabase, Canvas, Google, mensajes del asistente ni sesiones. Se sirve con `Cache-Control: no-store` y CSP `'self'`. Para actualizarlo, sube `VERSION`.
 - **Rutas públicas:** `/manifest.webmanifest`, `/sw.js` y `/offline.html` no necesitan sesión (no contienen datos).
 - **Instalar:** en Chrome/Edge, "Instalar" en Inicio (una línea discreta) y en Ajustes (usa `beforeinstallprompt`); en iPhone, Compartir → Añadir a pantalla de inicio. "Ahora no" la oculta 30 días en ese dispositivo; instalada, no aparece nada.
 - **Móvil:** márgenes con `env(safe-area-inset-*)` en los cuatro lados; la barra inferior respeta el indicador de inicio y se oculta mientras se escribe en el móvil; campos a 16 px en pantallas táctiles (iOS no hace zoom al enfocarlos); botones de 44 px en táctil.
@@ -359,7 +359,7 @@ Migración `20261008083736_notifications.sql`. Ajustes en `/settings` (icono jun
 | Proyectos (`public.projects`) | Reales en Proyectos (crear, editar, archivar, borrar) y en Inicio (proyectos activos, asignación de tareas). Recuentos de tareas derivados de `public.tasks`. |
 | Calendario (`public.calendar_events`) | Real: eventos (crear, editar, borrar) y entregas derivadas de `public.tasks`; navegación por mes en la URL (`?mes=&dia=`). Vistas Día y Semana aún sin implementar. |
 | Inbox (`public.inbox_items` + `public.tasks`) | Real: captura de tareas, ideas y notas; edición y borrado; filtros y recuentos reales. |
-| Canvas · conexión | Completa: lectura de perfil y cursos activos (`/dev/canvas`). |
+| Canvas · conexión | Completa: lectura de perfil y cursos activos (`/projects/canvas`). |
 | Canvas · vinculación de cursos | Completa: `public.canvas_course_links` + `/projects/canvas`; etiqueta CAMPUS en Proyectos. |
 | Canvas · entregas | Completa tras aplicar `20261006070920`: sincronización manual con vista previa en `/projects/canvas`; las entregas son tareas reales (`source = 'canvas'`). Clasificación (importar / revisar / omitir) y decisiones por entrega tras aplicar `20261006082922`. |
 | Canvas · sincronización automática | Tras aplicar `20261007083209`: mientras usas TRAZA y, en producción, también con la app cerrada (programador, `20261008094339` + `20261008121027`), como mucho cada 30 min, con turno por usuario en la base de datos. El programador solo la ejecuta si **un único** usuario tiene cursos vinculados (el token de Canvas es personal). Sin anuncios, módulos, archivos, foros ni eventos del calendario de Canvas. |

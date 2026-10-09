@@ -86,7 +86,7 @@ Los pasos que necesitan el dominio final van **después** del primer despliegue.
    ```powershell
    node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
    ```
-3. **Proyecto de Vercel** (no existe todavía).
+3. **Proyecto de Vercel** (solo la primera vez; TRAZA ya está desplegada en `https://traza-gray.vercel.app`).
    - **Opción A, recomendada (git):** sube el repositorio a un repositorio **privado** de GitHub y en vercel.com/new → *Import Git Repository* elige ese repositorio. El preset es Next.js; deja *Build Command* y *Install Command* por defecto. La rama de producción es la rama por defecto.
    - **Opción B (CLI, sin git remoto):** `npx vercel@latest login` y después `npx vercel@latest link`. `.vercelignore` impide subir `.env*`.
    - En Settings → Functions comprueba que **Fluid Compute** está activado (lo está por defecto en proyectos nuevos): el programador declara `maxDuration = 300` s, y sin Fluid Compute el plan Hobby solo permite 60 s.
@@ -170,10 +170,24 @@ El script nunca imprime el secreto. Lee `SCHEDULER_SECRET` del entorno o de `.en
 | Campus | Sincronización manual; automática con la app abierta; programada con la app cerrada (paso 15). |
 | Google | Conectar en producción (vuelve a `/calendar?google=conectado`); sincronización manual, automática y programada (paso 16). |
 | Asistente | Una pregunta responde (Groq); confirmar una propuesta la crea una sola vez (si se pulsa otra vez, no se duplica). |
-| PWA | Se instala en el iPhone; el modo independiente respeta las zonas seguras; DevTools → Application muestra el service worker activo y solo `traza-static-v1` en la caché. |
+| PWA | Se instala en el iPhone; el modo independiente respeta las zonas seguras; DevTools → Application muestra el service worker activo y solo `traza-static-v2` en la caché. |
 | Push | Suscripción; notificación de prueba; aviso programado con TRAZA cerrada; al tocarla abre una ruta de TRAZA. |
 | Programador | `POST /api/internal/scheduler` sin secreto → 401 (`node scripts/scheduler-check.mjs --base https://<dominio>`); `net._http_response` muestra 200 cada 5 min; ningún aviso repetido. |
-| Desarrollo | `https://<dominio>/dev/supabase` y `/dev/canvas` → 404. |
+| Sin rutas de desarrollo | `/dev/*` no existe: sin sesión redirige a `/login` como cualquier ruta privada; con sesión, 404. |
+
+Permisos de las funciones del programador en el proyecto real (SQL Editor; las 9 filas deben mostrar `false` · `false` · `true`):
+
+```sql
+select p.proname,
+       has_function_privilege('anon', p.oid, 'execute')          as anon,
+       has_function_privilege('authenticated', p.oid, 'execute') as authenticated,
+       has_function_privilege('service_role', p.oid, 'execute')  as service_role
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+ where n.nspname = 'public' and p.proname like 'scheduler\_%'
+ order by 1;
+```
+
+Lista completa para la publicación: [docs/release-checklist.md](release-checklist.md).
 
 ## Operación
 

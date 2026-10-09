@@ -1,6 +1,6 @@
 // Provider-neutral contract for TRAZA's language-model calls. Application code (lib/assistant)
-// depends only on this and on lib/ai/provider.ts, never on a concrete provider. The active
-// implementation is lib/ai/groq.ts (lib/ai/gemini.ts is kept, inactive). A model is only ever
+// depends only on this and on lib/ai/provider.ts, never on a concrete provider. The
+// implementation is lib/ai/groq.ts. A model is only ever
 // asked for TEXT shaped by a JSON schema: it has no tools, no database access and no credentials.
 
 /** A JSON-schema subset every structured-output provider understands (OpenAPI style). */
@@ -10,8 +10,8 @@ export type ResponseSchema =
   | { type: "string"; enum?: string[]; nullable?: boolean; description?: string }
   | { type: "boolean"; nullable?: boolean; description?: string };
 
-/** The providers TRAZA can talk to. Only the one chosen in lib/ai/provider.ts is ever called. */
-export type AiProviderName = "groq" | "gemini";
+/** The provider TRAZA talks to (chosen in lib/ai/provider.ts). */
+export type AiProviderName = "groq";
 
 /** Server-only credentials for one provider call path. Never logged, rendered or stored. */
 export type ProviderCredentials = { apiKey: string; model: string };
@@ -54,7 +54,6 @@ export type ProviderStage =
   | "http_403"
   | "http_429"
   | "provider_5xx"
-  | "empty_candidates"
   | "empty_choices"
   | "safety_block"
   | "max_tokens"
@@ -69,9 +68,9 @@ export type AiDiagnostic = {
   attempts?: number;
   /** Wall-clock milliseconds of the whole call, retries and waits included. */
   elapsedMs?: number;
-  /** The provider's finish reason, upper-cased (an enum such as STOP, LENGTH, MAX_TOKENS, SAFETY). */
+  /** The provider's finish reason, upper-cased (an enum such as STOP, LENGTH, CONTENT_FILTER). */
   finishReason?: string;
-  /** Candidates (Gemini) or choices (OpenAI-compatible APIs) returned. */
+  /** Choices returned. */
   candidates?: number;
   /** Token usage reported by the provider (counts only). */
   tokens?: { prompt?: number; thoughts?: number; output?: number };

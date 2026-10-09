@@ -80,10 +80,6 @@ export function groupItemsByDate(items: CalendarItem[]): Map<ISODate, CalendarIt
   return groups;
 }
 
-export function isEventItem(item: CalendarItem): item is CalendarEventItem {
-  return item.itemType === "event";
-}
-
 /**
  * Próximas entregas: pending tasks with a due date, overdue ones included (they still need doing),
  * oldest date first. Completed tasks are never upcoming.

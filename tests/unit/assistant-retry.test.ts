@@ -1,23 +1,24 @@
-// The shared bounded retry policy (lib/ai/retry.ts), exercised through the inactive Gemini adapter, against a scripted FAKE fetch and a virtual clock (no
-// real waiting, no network, fake key). Also checks that retries never duplicate assistant
-// messages or proposals.
+// The shared bounded retry policy (lib/ai/retry.ts), exercised through the active Groq adapter, against a
+// scripted FAKE fetch and a virtual clock (no real waiting, no network, fake key). Also checks that
+// retries never duplicate assistant messages or proposals.
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { createGeminiProvider } from "@/lib/ai/gemini";
+import { createGroqProvider } from "@/lib/ai/groq";
 import { ATTEMPT_TIMEOUT_MS, MAX_ATTEMPTS, RETRY_JITTER, TOTAL_TIMEOUT_MS, retryDelay, type RetryRuntime } from "@/lib/ai/retry";
 import type { AiRequest } from "@/lib/ai/types";
 import { REPLY_SCHEMA } from "@/lib/assistant/prompt";
 import { runAssistantTurn, TURN_ERRORS, type AssistantStore } from "@/lib/assistant/turn";
 import type { Proposal } from "@/lib/assistant/types";
 
-const FAKE_KEY = "AIzaFAKE-gemini-key-not-real-0123456789";
+const FAKE_KEY = "gsk_FAKE-groq-key-not-real-0123456789abcdef";
 const request: AiRequest = { system: "Reglas", turns: [{ role: "user", text: "¿Qué tengo mañana?" }], schema: REPLY_SCHEMA };
 const ANSWER = JSON.stringify({ message: "Mañana tienes «Imprimir planos».", actions: [] });
 
 /** One scripted attempt: an HTTP status, a valid answer, or a thrown network / timeout error. */
 type Step = number | "ok" | "network" | "timeout" | "malformed" | "safety" | "max_tokens" | { text: string };
 
-const envelope = (text: string, finishReason = "STOP") => Response.json({ candidates: [{ content: { role: "model", parts: [{ text }] }, finishReason }] });
+const completion = (content: string, finishReason = "stop") =>
+  Response.json({ choices: [{ index: 0, message: { role: "assistant", content }, finish_reason: finishReason }] });
 
 function scripted(steps: Step[], options: { attemptMs?: number } = {}) {
   let clock = 0;
@@ -32,8 +33,8 @@ function scripted(steps: Step[], options: { attemptMs?: number } = {}) {
     random: () => 0.5,
     now: () => clock,
   };
-  const provider = createGeminiProvider(
-    { apiKey: FAKE_KEY, model: "gemini-3.8-flash" },
+  const provider = createGroqProvider(
+    { apiKey: FAKE_KEY, model: "openai/gpt-oss-20b" },
     async (_url, init) => {
       const step = steps[Math.min(calls, steps.length - 1)];
       calls++;
@@ -41,11 +42,11 @@ function scripted(steps: Step[], options: { attemptMs?: number } = {}) {
       clock += options.attemptMs ?? 100;
       if (step === "network") throw new TypeError("fetch failed");
       if (step === "timeout") throw new DOMException("The operation was aborted due to timeout", "TimeoutError");
-      if (step === "ok") return envelope(ANSWER);
+      if (step === "ok") return completion(ANSWER);
       if (step === "malformed") return new Response("<html>not json</html>", { status: 200 });
-      if (step === "safety") return Response.json({ candidates: [{ finishReason: "SAFETY" }] });
-      if (step === "max_tokens") return envelope('{"message":"cort', "MAX_TOKENS");
-      if (typeof step === "object") return envelope(step.text);
+      if (step === "safety") return completion("", "content_filter");
+      if (step === "max_tokens") return completion('{"message":"cort', "length");
+      if (typeof step === "object") return completion(step.text);
       return Response.json({ error: { message: `upstream detail ${FAKE_KEY}` } }, { status: step });
     },
     runtime,
@@ -53,7 +54,7 @@ function scripted(steps: Step[], options: { attemptMs?: number } = {}) {
   return { provider, delays, bodies, calls: () => calls, elapsed: () => clock };
 }
 
-describe("Gemini retries: transient failures recover", () => {
+describe("retries: transient failures recover", () => {
   const recovering: [string, Step[], number][] = [
     ["503 then 200", [503, "ok"], 2],
     ["503, 503, then 200", [503, 503, "ok"], 3],
@@ -101,7 +102,7 @@ describe("Gemini retries: transient failures recover", () => {
   });
 });
 
-describe("Gemini retries: bounded", () => {
+describe("retries: bounded", () => {
   it("gives up after four 503 attempts with the existing safe failure", async () => {
     const fake = scripted([503]);
     const result = await fake.provider.generate(request);
@@ -122,14 +123,14 @@ describe("Gemini retries: bounded", () => {
   });
 });
 
-describe("Gemini retries: never for permanent or content failures", () => {
+describe("retries: never for permanent or content failures", () => {
   const final: [string, Step, string][] = [
     ["400 never retries", 400, "http_400"],
     ["401 never retries", 401, "http_401"],
     ["403 never retries", 403, "http_403"],
     ["501 never retries", 501, "provider_5xx"],
     ["malformed HTTP 200 never retries", "malformed", "unexpected_response"],
-    ["a safety block never retries", "safety", "safety_block"],
+    ["a content-filter block never retries", "safety", "safety_block"],
     ["a truncated answer never retries", "max_tokens", "max_tokens"],
   ];
   for (const [name, step, stage] of final) {
@@ -176,7 +177,7 @@ const turn = (provider: ReturnType<typeof scripted>["provider"], store: Assistan
     { conversationId: null, text: "Recuérdame imprimir el A1 mañana" },
   );
 
-describe("Gemini retries through the assistant turn", () => {
+describe("retries through the assistant turn", () => {
   it("a recovered request stores one user message, one reply and each proposal once", async () => {
     const answer = JSON.stringify({ message: "Te propongo esta tarea.", actions: [{ type: "create_task", title: "Imprimir A1", date: "2026-10-08" }] });
     const fake = scripted([503, 503, { text: answer }]);

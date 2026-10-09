@@ -6,8 +6,6 @@ import type { AiProviderName, ProviderCredentials } from "./types";
 // Active provider: Groq (OpenAI-compatible chat completions).
 //   GROQ_API_KEY   Groq API key (required to enable the assistant)
 //   GROQ_MODEL     optional model name; defaults to DEFAULT_GROQ_MODEL
-//
-// GEMINI_* variables are no longer read: the Gemini adapter is inactive.
 
 export const DEFAULT_GROQ_MODEL = "openai/gpt-oss-20b";
 

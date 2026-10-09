@@ -4,9 +4,10 @@ import path from "node:path";
 import { describe, it } from "node:test";
 import manifest from "@/app/manifest";
 import nextConfig from "@/next.config";
+import { isPublicPath } from "@/lib/auth/routes";
 import { normalizeRedirectUri, readGoogleCalendarConfig } from "@/lib/google-calendar/env";
 
-// Production readiness (Prompt 23): headers, development routes, health check, base-URL rules,
+// Production readiness: headers, no development routes, error pages, health check, base-URL rules,
 // PWA paths and repository hygiene. Static checks plus pure functions; no server, no network.
 
 const ROOT = process.cwd();
@@ -84,24 +85,16 @@ describe("security headers", () => {
   });
 });
 
-describe("development routes are unavailable in production", () => {
-  it("every /dev page calls notFound() in production before doing anything", () => {
-    const pages = files(path.join(ROOT, "app", "dev"), (f) => /page\.tsx$/.test(f));
-    assert.ok(pages.length >= 2);
-    for (const page of pages) {
-      const source = code(rel(page));
-      const guard = source.indexOf('if (process.env.NODE_ENV === "production") notFound();');
-      assert.ok(guard > 0, rel(page));
-      const body = source.slice(source.indexOf("export default"));
-      assert.ok(body.indexOf("notFound()") < (body.indexOf("await ") === -1 ? Infinity : body.indexOf("await ")), `${rel(page)}: guard first`);
-    }
+describe("no development routes", () => {
+  it("the /dev diagnostics are gone: no app/dev folder, and /dev/* is private like any unknown path", () => {
+    assert.equal(existsSync(path.join(ROOT, "app", "dev")), false);
+    for (const p of ["/dev/supabase", "/dev/canvas", "/dev/anything"]) assert.equal(isPublicPath(p), false, p);
+    assert.doesNotMatch(code("lib/auth/routes.ts"), /\/dev\//);
   });
 
-  it("no route outside app/dev is a development diagnostic", () => {
+  it("no route is a development diagnostic", () => {
     for (const file of files(path.join(ROOT, "app"), (f) => /(page|route)\.tsx?$/.test(f))) {
-      const name = rel(file);
-      if (name.startsWith("app/dev/")) continue;
-      assert.doesNotMatch(name, /\/(debug|diagnostics?|test)\//, name);
+      assert.doesNotMatch(rel(file), /\/(dev|debug|diagnostics?|test)\//, rel(file));
     }
   });
 
@@ -120,6 +113,30 @@ describe("development routes are unavailable in production", () => {
       .map(rel)
       .filter((file) => ungatedLogs(file).length > 0);
     assert.deepEqual(withProductionLogs, ["app/api/internal/scheduler/route.ts"]);
+  });
+});
+
+describe("no Supabase access from the browser", () => {
+  it("there is no browser Supabase client: every read and write goes through the server", () => {
+    assert.equal(existsSync(path.join(ROOT, "lib", "supabase", "client.ts")), false);
+    for (const file of ["app", "lib", "components"].flatMap((dir) => files(path.join(ROOT, dir), (f) => /\.(ts|tsx)$/.test(f)))) {
+      const source = read(rel(file));
+      assert.doesNotMatch(source, /createBrowserClient/, rel(file));
+      if (/^["']use client["']/m.test(source)) assert.doesNotMatch(source, /@supabase\/|@\/lib\/supabase\//, `${rel(file)} is a Client Component`);
+    }
+  });
+});
+
+describe("error pages", () => {
+  it("unknown addresses and unexpected errors show restrained Spanish pages that expose and log nothing", () => {
+    const notFound = code("app/not-found.tsx");
+    assert.match(notFound, /No encontrada/);
+    const error = code("app/error.tsx");
+    assert.match(error, /^"use client";/);
+    assert.match(error, /Algo ha fallado/);
+    for (const source of [notFound, error]) {
+      assert.doesNotMatch(source, /error\.(message|stack|digest)|console\.|JSON\.stringify|supabase|process\.env/);
+    }
   });
 });
 
@@ -166,7 +183,7 @@ describe("production URLs", () => {
     const allowed = new Set(["lib/canvas/env.ts", "lib/google-calendar/env.ts"]);
     for (const file of ["app", "lib", "components"].flatMap((dir) => files(path.join(ROOT, dir), (f) => /\.(ts|tsx)$/.test(f)))) {
       const name = rel(file);
-      if (name.startsWith("app/dev/") || allowed.has(name)) continue;
+      if (allowed.has(name)) continue;
       assert.doesNotMatch(code(name), /localhost|127\.0\.0\.1|http:\/\//, name);
     }
     assert.doesNotMatch(read("public/sw.js"), /localhost|127\.0\.0\.1|http:\/\//);
@@ -185,7 +202,9 @@ describe("production URLs", () => {
 describe("repository hygiene", () => {
   it("env files, Vercel's local folder and key files are ignored", () => {
     const ignore = read(".gitignore");
-    for (const rule of [".env*", ".vercel", "*.pem"]) assert.ok(ignore.split(/\r?\n/).includes(rule), rule);
+    for (const rule of [".env*", ".vercel", "*.pem", "client_secret*.json", "*credentials*.json", "*service-account*.json", "*.p12"]) {
+      assert.ok(ignore.split(/\r?\n/).includes(rule), rule);
+    }
   });
 
   it("no migration contains a secret, a production URL or a bearer token", () => {
