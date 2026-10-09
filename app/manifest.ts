@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 
 // The installable-app description of TRAZA (served at /manifest.webmanifest, public: the install
 // flow may start before signing in). Local, static icons only (public/icons, generated from the
-// brand mark by scripts/generate-icons.mjs). No orientation lock: TRAZA also runs on tablets and
+// official mark public/brand/traza-mark.svg by scripts/generate-icons.mjs). No orientation lock: TRAZA also runs on tablets and
 // desktops, and landscape must keep working.
 
 const PWA_BACKGROUND = "#F4F2ED";

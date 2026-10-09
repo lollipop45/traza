@@ -5,6 +5,7 @@
 // notificaciones"; never shows endpoints, keys or browser internals. States are text, not colour.
 import { Bell, BellOff, Download, Send } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
+import { AppIconPreview } from "@/components/pwa/AppIconPreview";
 import { Button } from "@/components/ui/Button";
 import { sendTestNotification } from "@/lib/notifications/actions";
 import {
@@ -93,6 +94,14 @@ export function DeviceSection({ publicKey }: DeviceSectionProps) {
 
   return (
     <div className="flex flex-col gap-6">
+      <div className="flex items-center gap-3">
+        <AppIconPreview />
+        <p className="flex flex-col gap-1">
+          <span className="text-[14px] leading-none font-semibold tracking-[0.2em] text-charcoal">TRAZA</span>
+          <span className={labelClass}>Icono de la app</span>
+        </p>
+      </div>
+
       <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5 text-[14px]">
         <dt className={`${labelClass} leading-[21px]`}>Instalación</dt>
         <dd className={stateClass}>{install === "installed" || isStandalone(environment) ? "Instalada" : "No instalada"}</dd>

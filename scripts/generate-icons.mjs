@@ -1,16 +1,18 @@
-// Generates TRAZA's PWA icons from the brand mark (a square cut by its diagonal, as in
-// components/ui/Wordmark.tsx). No dependencies: the mark is pure geometry, rasterised here with 4×4
-// supersampling and written as PNG with node:zlib. Re-run after changing the mark:
+// Generates TRAZA's brand rasters from the vector master, public/brand/traza-mark.svg (the official
+// mark, vectorised from brand/traza-mark-source.png). No dependencies: the mark is three straight-edged
+// polygons, rasterised here with supersampled point-in-polygon coverage and written as PNG with
+// node:zlib. Re-run after changing the master:
 //
 //   node scripts/generate-icons.mjs
 //
 // Outputs (committed, static, public):
+//   public/brand/traza-mark.png                         1024 px wide transparent master (charcoal)
 //   public/icons/icon-192.png, icon-512.png            "any" icons (sand ground, charcoal mark)
-//   public/icons/maskable-192.png, maskable-512.png    mark inside the 80 % safe zone
+//   public/icons/maskable-192.png, maskable-512.png    whole mark inside the 80 % safe-zone circle
 //   public/icons/apple-touch-icon.png                  180 × 180, opaque
 //   public/icons/badge-96.png                          monochrome (alpha only) notification badge
 //   app/favicon.ico                                    16 + 32 px, PNG-in-ICO
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { deflateSync } from "node:zlib";
@@ -18,6 +20,38 @@ import { deflateSync } from "node:zlib";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SAND = [0xf4, 0xf2, 0xed];
 const CHARCOAL = [0x1f, 0x1f, 0x1f];
+
+// --- The mark (read from the master) -----------------------------------------
+
+/** viewBox size and polygons of the master SVG (absolute M/L/Z path, as the master is written). */
+function readMaster() {
+  const svg = readFileSync(join(ROOT, "public/brand/traza-mark.svg"), "utf8");
+  const [, , vw, vh] = svg.match(/viewBox="([^"]+)"/)[1].split(/\s+/).map(Number);
+  const d = svg.match(/\sd="([^"]+)"/)[1];
+  if (/[^MLZ0-9.\s-]/.test(d)) throw new Error("Master path must use absolute M/L/Z commands only");
+  const polygons = d
+    .split("Z")
+    .filter((part) => part.trim())
+    .map((part) => {
+      const numbers = part.replace(/[ML]/g, " ").trim().split(/\s+/).map(Number);
+      const points = [];
+      for (let i = 0; i < numbers.length; i += 2) points.push([numbers[i], numbers[i + 1]]);
+      return points;
+    });
+  return { width: vw, height: vh, polygons };
+}
+const MARK = readMaster();
+
+function inPolygon(x, y, points) {
+  let inside = false;
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    const [xi, yi] = points[i];
+    const [xj, yj] = points[j];
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+const inMark = (x, y) => MARK.polygons.some((points) => inPolygon(x, y, points));
 
 // --- PNG encoding -----------------------------------------------------------
 
@@ -39,17 +73,17 @@ function chunk(type, data) {
   crc.writeUInt32BE(crc32(body));
   return Buffer.concat([length, body, crc]);
 }
-/** RGBA pixels (Uint8Array, size × size × 4) → PNG. */
-function png(size, rgba) {
+/** RGBA pixels (Uint8Array, width × height × 4) → PNG. */
+function png(width, height, rgba) {
   const header = Buffer.alloc(13);
-  header.writeUInt32BE(size, 0);
-  header.writeUInt32BE(size, 4);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
   header[8] = 8; // bit depth
   header[9] = 6; // RGBA
-  const rows = Buffer.alloc(size * (size * 4 + 1));
-  for (let y = 0; y < size; y++) {
-    rows[y * (size * 4 + 1)] = 0; // filter: none
-    Buffer.from(rgba.buffer, y * size * 4, size * 4).copy(rows, y * (size * 4 + 1) + 1);
+  const rows = Buffer.alloc(height * (width * 4 + 1));
+  for (let y = 0; y < height; y++) {
+    rows[y * (width * 4 + 1)] = 0; // filter: none
+    Buffer.from(rgba.buffer, y * width * 4, width * 4).copy(rows, y * (width * 4 + 1) + 1);
   }
   return Buffer.concat([
     Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
@@ -59,40 +93,34 @@ function png(size, rgba) {
   ]);
 }
 
-// --- The mark ---------------------------------------------------------------
+// --- Rendering --------------------------------------------------------------
 
 /**
- * Coverage (0..1) of the mark at a point: a square outline of side `side` centred in the canvas,
- * with stroke `stroke`, plus the diagonal from its bottom-left to its top-right corner.
+ * Renders the mark centred on a width × height canvas, `markWidth` pixels wide (its height follows
+ * the master's proportions: the geometry is never stretched). `background` null = transparent.
  */
-function markAt(x, y, size, side, stroke) {
-  const x0 = (size - side) / 2;
-  const y0 = (size - side) / 2;
-  const inOuter = x >= x0 && x <= x0 + side && y >= y0 && y <= y0 + side;
-  if (!inOuter) return false;
-  const inInner = x >= x0 + stroke && x <= x0 + side - stroke && y >= y0 + stroke && y <= y0 + side - stroke;
-  if (!inInner) return true;
-  // Diagonal: points (x0, y0 + side) → (x0 + side, y0), i.e. (x - x0) + (y - y0) = side.
-  const distance = Math.abs(x - x0 + (y - y0) - side) / Math.SQRT2;
-  return distance <= stroke / 2;
-}
-
-/** Renders the mark. `fraction` = mark side / canvas; `strokeRatio` = stroke / mark side. */
-function render(size, { fraction, strokeRatio, background, color = CHARCOAL }) {
-  const side = Math.round(size * fraction);
-  const stroke = Math.max(1, side * strokeRatio);
-  const rgba = new Uint8Array(size * size * 4);
-  const samples = 4;
-  for (let py = 0; py < size; py++) {
-    for (let px = 0; px < size; px++) {
+function render(width, height, { markWidth, background, color = CHARCOAL }) {
+  const scale = markWidth / MARK.width;
+  // Small sizes: whole-pixel placement keeps the frame's top and left edges sharp (the mark moves by
+  // under half a pixel; its geometry is unchanged), and more samples per pixel.
+  const small = Math.max(width, height) <= 64;
+  const place = small ? Math.round : (v) => v;
+  const ox = place((width - MARK.width * scale) / 2);
+  const oy = place((height - MARK.height * scale) / 2);
+  const samples = small ? 16 : 4;
+  const rgba = new Uint8Array(width * height * 4);
+  for (let py = 0; py < height; py++) {
+    for (let px = 0; px < width; px++) {
       let hits = 0;
       for (let sy = 0; sy < samples; sy++) {
         for (let sx = 0; sx < samples; sx++) {
-          if (markAt(px + (sx + 0.5) / samples, py + (sy + 0.5) / samples, size, side, stroke)) hits++;
+          const x = (px + (sx + 0.5) / samples - ox) / scale;
+          const y = (py + (sy + 0.5) / samples - oy) / scale;
+          if (inMark(x, y)) hits++;
         }
       }
       const coverage = hits / (samples * samples);
-      const i = (py * size + px) * 4;
+      const i = (py * width + px) * 4;
       if (background) {
         for (let c = 0; c < 3; c++) rgba[i + c] = Math.round(background[c] * (1 - coverage) + color[c] * coverage);
         rgba[i + 3] = 255;
@@ -102,8 +130,10 @@ function render(size, { fraction, strokeRatio, background, color = CHARCOAL }) {
       }
     }
   }
-  return png(size, rgba);
+  return png(width, height, rgba);
 }
+/** Square icon; `fraction` = mark width / icon size. */
+const icon = (size, { fraction, ...rest }) => render(size, size, { markWidth: size * fraction, ...rest });
 
 /** ICO container holding PNG images (supported by every current browser). */
 function ico(images) {
@@ -128,22 +158,29 @@ function ico(images) {
 
 // --- Outputs ----------------------------------------------------------------
 
-const any = { fraction: 0.5, strokeRatio: 0.075, background: SAND };
-// Maskable: the whole mark (its corners included) stays inside the central 80 % circle.
-const maskable = { fraction: 0.42, strokeRatio: 0.075, background: SAND };
-// Tiny sizes need a bolder, larger mark to stay legible.
-const favicon = { fraction: 0.78, strokeRatio: 0.12, background: SAND };
+// Generous optical padding: the solid mark carries more weight than its bounding box suggests.
+const any = { fraction: 0.54, background: SAND };
+// Maskable: the whole mark (its four filled corners included) stays inside the central 80 % circle.
+// Its half-diagonal is 0.69 × its width, so any fraction up to 0.57 fits; 0.46 leaves a margin.
+const maskable = { fraction: 0.46, background: SAND };
+// Tiny sizes: as large as the tab allows, so the gaps between the three parts stay open.
+const favicon = { fraction: 0.875, background: SAND };
 
+const MASTER_WIDTH = 1024;
 const outputs = {
-  "public/icons/icon-192.png": render(192, any),
-  "public/icons/icon-512.png": render(512, any),
-  "public/icons/maskable-192.png": render(192, maskable),
-  "public/icons/maskable-512.png": render(512, maskable),
-  "public/icons/apple-touch-icon.png": render(180, any),
-  "public/icons/badge-96.png": render(96, { fraction: 0.7, strokeRatio: 0.1, background: null, color: [255, 255, 255] }),
+  "public/brand/traza-mark.png": render(MASTER_WIDTH, Math.round((MASTER_WIDTH * MARK.height) / MARK.width), {
+    markWidth: MASTER_WIDTH,
+    background: null,
+  }),
+  "public/icons/icon-192.png": icon(192, any),
+  "public/icons/icon-512.png": icon(512, any),
+  "public/icons/maskable-192.png": icon(192, maskable),
+  "public/icons/maskable-512.png": icon(512, maskable),
+  "public/icons/apple-touch-icon.png": icon(180, any),
+  "public/icons/badge-96.png": icon(96, { fraction: 0.78, background: null, color: [255, 255, 255] }),
   "app/favicon.ico": ico([
-    { size: 16, data: render(16, favicon) },
-    { size: 32, data: render(32, favicon) },
+    { size: 16, data: icon(16, favicon) },
+    { size: 32, data: icon(32, favicon) },
   ]),
 };
 

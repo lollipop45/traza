@@ -16,7 +16,7 @@
  * Updating: bump VERSION. The new worker activates at once (skipWaiting + clients.claim, without
  * reloading any page) and deletes every older TRAZA cache.
  */
-const VERSION = "v1";
+const VERSION = "v2"; // v2: the official TRAZA mark (new icons and offline page)
 const CACHE_PREFIX = "traza-static-";
 const STATIC_CACHE = CACHE_PREFIX + VERSION;
 const OFFLINE_URL = "/offline.html";

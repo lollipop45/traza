@@ -6,7 +6,9 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, it } from "node:test";
 import vm from "node:vm";
+import { inflateSync } from "node:zlib";
 import manifest from "@/app/manifest";
+import { TRAZA_MARK_PATH, TRAZA_MARK_VIEWBOX } from "@/components/ui/TrazaMark";
 import { isPublicPath } from "@/lib/auth/routes";
 import { NOTIFICATION_PATHS } from "@/lib/notifications/payload";
 import {
@@ -72,6 +74,84 @@ describe("PWA manifest", () => {
   it("the manifest, worker and offline page are reachable without a session; private routes are not", () => {
     for (const p of ["/manifest.webmanifest", "/sw.js", "/offline.html", "/login"]) assert.equal(isPublicPath(p), true, p);
     for (const p of ["/", "/settings", "/calendar", "/api/notifications/subscription", "/offline"]) assert.equal(isPublicPath(p), false, p);
+  });
+});
+
+/** RGBA pixels of a PNG written by scripts/generate-icons.mjs (8-bit RGBA, filter 0 on every row). */
+function pngPixels(file: string) {
+  const data = readFileSync(path.join(ROOT, file));
+  const [width, height] = pngSize(file);
+  assert.equal(data[24], 8, "8-bit");
+  assert.equal(data[25], 6, "RGBA");
+  const idat: Buffer[] = [];
+  for (let offset = 8; offset < data.length; ) {
+    const length = data.readUInt32BE(offset);
+    if (data.toString("ascii", offset + 4, offset + 8) === "IDAT") idat.push(data.subarray(offset + 8, offset + 8 + length));
+    offset += 12 + length;
+  }
+  const rows = inflateSync(Buffer.concat(idat));
+  const at = (x: number, y: number) => {
+    const row = y * (width * 4 + 1);
+    assert.equal(rows[row], 0, "unfiltered row");
+    const i = row + 1 + x * 4;
+    return [rows[i], rows[i + 1], rows[i + 2], rows[i + 3]];
+  };
+  return { width, height, at };
+}
+
+describe("TRAZA brand mark", () => {
+  const master = read("public/brand/traza-mark.svg");
+
+  it("one geometry everywhere: the master SVG, the React mark and the offline page", () => {
+    assert.match(master, new RegExp(`viewBox="${TRAZA_MARK_VIEWBOX}"`));
+    assert.ok(master.includes(`d="${TRAZA_MARK_PATH}"`), "component path = master path");
+    assert.ok(read("public/offline.html").includes(`d="${TRAZA_MARK_PATH}"`), "offline page path = master path");
+    assert.equal(TRAZA_MARK_PATH.match(/Z/g)?.length, 3, "three parts: two corners and the diagonal band");
+    assert.match(read("components/ui/Wordmark.tsx"), /<TrazaMark /);
+  });
+
+  it("the square-and-diagonal placeholder is gone", () => {
+    for (const file of ["components/ui/Wordmark.tsx", "public/offline.html", "scripts/generate-icons.mjs"]) {
+      const source = read(file);
+      assert.doesNotMatch(source, /viewBox="0 0 10 10"|M0\.5 9\.5 9\.5 0\.5|[Pp]laceholder/, file);
+    }
+    assert.match(read("scripts/generate-icons.mjs"), /public\/brand\/traza-mark\.svg/, "icons are rasterised from the master");
+  });
+
+  it("the master PNG is transparent, charcoal and keeps the mark's proportions", () => {
+    const png = pngPixels("public/brand/traza-mark.png");
+    assert.equal(png.width, 1024);
+    assert.equal(png.height, Math.round((1024 * 351.34) / 364.57));
+    assert.deepEqual(png.at(0, 0), [31, 31, 31, 255], "top-left corner of the frame is solid charcoal");
+    // (100, 120) in master units: inside the frame, between the left bar and the diagonal band.
+    assert.equal(png.at(281, 337)[3], 0, "the open area inside the frame is transparent (no grid, no ground)");
+  });
+
+  it("app icons: sand ground and charcoal mark; maskable icons keep the mark inside the safe zone", () => {
+    for (const file of ["public/icons/icon-192.png", "public/icons/icon-512.png", "public/icons/apple-touch-icon.png"]) {
+      const png = pngPixels(file);
+      assert.deepEqual(png.at(0, 0), [0xf4, 0xf2, 0xed, 255], `${file} corner is opaque sand`);
+      const c = Math.floor(png.width * 0.25);
+      assert.deepEqual(png.at(c, c), [0x1f, 0x1f, 0x1f, 255], `${file} frame corner is charcoal`);
+    }
+    for (const file of ["public/icons/maskable-192.png", "public/icons/maskable-512.png"]) {
+      const png = pngPixels(file);
+      const r = png.width * 0.4;
+      for (let y = 0; y < png.height; y++) {
+        for (let x = 0; x < png.width; x++) {
+          if (Math.hypot(x + 0.5 - png.width / 2, y + 0.5 - png.height / 2) <= r) continue;
+          assert.deepEqual(png.at(x, y), [0xf4, 0xf2, 0xed, 255], `${file} (${x}, ${y}) outside the safe zone`);
+        }
+      }
+    }
+    const badge = pngPixels("public/icons/badge-96.png");
+    assert.equal(badge.at(0, 0)[3], 0, "badge ground is transparent");
+    assert.deepEqual(badge.at(48, 48).slice(0, 3), [255, 255, 255], "badge is monochrome white");
+  });
+
+  it("the design source stays out of the public folder", () => {
+    assert.ok(existsSync(path.join(ROOT, "brand/traza-mark-source.png")));
+    assert.ok(!existsSync(path.join(ROOT, "public/icons/publicbrandtraza-mark.png")));
   });
 });
 
@@ -264,15 +344,15 @@ describe("service worker: caching", () => {
   it("precaches only the offline page and icons, in one versioned cache", async () => {
     const sw = loadWorker();
     await sw.install();
-    assert.deepEqual([...sw.stores.keys()], ["traza-static-v1"]);
-    assert.deepEqual([...sw.stores.get("traza-static-v1")!.keys()].sort(), ["/icons/badge-96.png", "/icons/icon-192.png", "/icons/icon-512.png", "/offline.html"]);
+    assert.deepEqual([...sw.stores.keys()], ["traza-static-v2"]);
+    assert.deepEqual([...sw.stores.get("traza-static-v2")!.keys()].sort(), ["/icons/badge-96.png", "/icons/icon-192.png", "/icons/icon-512.png", "/offline.html"]);
     assert.equal(sw.flags().skipped, true);
   });
 
   it("never caches app pages, APIs, Server Actions, Supabase or third-party responses", async () => {
     const sw = loadWorker();
     await sw.install();
-    const before = JSON.stringify([...sw.stores.get("traza-static-v1")!.keys()]);
+    const before = JSON.stringify([...sw.stores.get("traza-static-v2")!.keys()]);
     for (const [url, mode, method] of [
       ["/", "navigate", "GET"],
       ["/calendar", "navigate", "GET"],
@@ -288,7 +368,7 @@ describe("service worker: caching", () => {
       if (mode === "navigate") assert.ok(responded, "navigations go through the worker (network first)");
       else assert.equal(responded, null, `${url} is left to the browser`);
     }
-    assert.equal(JSON.stringify([...sw.stores.get("traza-static-v1")!.keys()]), before, "nothing was stored");
+    assert.equal(JSON.stringify([...sw.stores.get("traza-static-v2")!.keys()]), before, "nothing was stored");
     assert.equal(sw.stores.size, 1);
   });
 
@@ -299,19 +379,19 @@ describe("service worker: caching", () => {
     assert.equal(await page.text(), `network ${ORIGIN}/calendar`);
 
     const offline = loadWorker({ network: "down" });
-    await offline.caches.open("traza-static-v1").then((cache) => cache.addAll(["/offline.html"]));
+    await offline.caches.open("traza-static-v2").then((cache) => cache.addAll(["/offline.html"]));
     const fallback = await (await offline.fetch("/projects", "navigate"))!;
     assert.equal(await fallback.text(), "static /offline.html", "never a cached private page");
   });
 
   it("activation deletes every older cache and claims open windows without reloading", async () => {
     const sw = loadWorker();
-    await sw.caches.open("traza-static-v0");
+    await sw.caches.open("traza-static-v1");
     await sw.caches.open("some-old-cache");
     await sw.install();
     await sw.activate();
-    assert.deepEqual(sw.deleted.sort(), ["some-old-cache", "traza-static-v0"]);
-    assert.deepEqual([...sw.stores.keys()], ["traza-static-v1"]);
+    assert.deepEqual(sw.deleted.sort(), ["some-old-cache", "traza-static-v1"], "the placeholder-era icons are dropped");
+    assert.deepEqual([...sw.stores.keys()], ["traza-static-v2"]);
     assert.equal(sw.flags().claimed, true);
     assert.doesNotMatch(read("public/sw.js"), /location\.reload|\.reload\(/);
   });

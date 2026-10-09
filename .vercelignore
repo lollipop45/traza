@@ -3,3 +3,5 @@
 .env*
 *.pem
 .vercel
+# Design source of the mark (the app uses public/brand and public/icons).
+/brand/

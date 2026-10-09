@@ -5,6 +5,7 @@
 // 30 days on this device after "Ahora no". Never a modal, never shown on page load by the browser.
 import { Download, X } from "lucide-react";
 import { useState, useSyncExternalStore } from "react";
+import { AppIconPreview } from "@/components/pwa/AppIconPreview";
 import { INSTALL_HINT_STORAGE_KEY, installState, shouldShowInstallHint } from "@/lib/pwa/device";
 import { promptInstall } from "@/lib/pwa/install-prompt";
 import { useDisplayEnvironment, useInstallPrompt } from "@/lib/pwa/use-device";
@@ -42,6 +43,7 @@ export function InstallHint() {
 
   return (
     <aside aria-label="Instalar TRAZA" className="flex items-start gap-3 border-y border-charcoal/10 py-3">
+      <AppIconPreview />
       <p className="min-w-0 flex-1 text-[13px] leading-[1.5] text-graphite">
         {state === "ios" ? (
           <>
